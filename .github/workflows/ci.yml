@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: zhixu
+          MYSQL_USER: zhixu
+          MYSQL_PASSWORD: ci-database-password
+          MYSQL_ROOT_PASSWORD: ci-root-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -uroot -pci-root-password --silent"
+          --health-interval=10s --health-timeout=5s --health-retries=20
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping" --health-interval=10s
+          --health-timeout=3s --health-retries=10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: python -m pip install -r backend/requirements.txt
+      - name: Django tests and migration check
+        working-directory: backend
+        env:
+          USE_SQLITE: "1"
+          MYSQL_PASSWORD: ci-database-password
+        run: |
+          python manage.py test
+          python manage.py makemigrations --check --dry-run
+      - name: Django production security check
+        working-directory: backend
+        env:
+          DJANGO_ENV: production
+          DJANGO_DEBUG: "0"
+          DJANGO_SECURE_SSL: "1"
+          DJANGO_HSTS_SECONDS: "31536000"
+          DJANGO_HSTS_INCLUDE_SUBDOMAINS: "1"
+          DJANGO_HSTS_PRELOAD: "1"
+          DJANGO_SECRET_KEY: ci-only-random-secret-key-that-is-longer-than-fifty-characters-123
+          DJANGO_ALLOWED_HOSTS: example.com
+          CSRF_TRUSTED_ORIGINS: https://example.com
+          MYSQL_PASSWORD: ci-only-password
+        run: python manage.py check --deploy --fail-level WARNING
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: corepack enable
+      - name: Frontend locked install, audit and build
+        working-directory: frontend
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm audit --prod
+          pnpm build
+      - name: Browser role and core-flow smoke tests
+        working-directory: frontend
+        env:
+          MYSQL_PASSWORD: ci-database-password
+          E2E_USER: ci-learner
+          E2E_PASSWORD: Ci-browser-only-2026!
+          E2E_ADMIN_USER: ci-admin
+          E2E_ADMIN_PASSWORD: Ci-browser-only-2026!
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          cd ../backend
+          python manage.py migrate --noinput
+          python manage.py import_curated_roadmaps
+          python manage.py shell -c "from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.create_user(username='ci-learner', password='Ci-browser-only-2026!'); User.objects.create_user(username='ci-admin', password='Ci-browser-only-2026!', is_staff=True)"
+          python manage.py runserver 127.0.0.1:8000 --noreload >/tmp/zhixu-backend.log 2>&1 &
+          backend_pid=$!
+          cd ../frontend
+          pnpm dev --host 127.0.0.1 >/tmp/zhixu-frontend.log 2>&1 &
+          frontend_pid=$!
+          trap 'kill "$backend_pid" "$frontend_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do curl -fsS http://127.0.0.1:8000/api/health/ready/ && break; sleep 1; done
+          curl -fsS http://127.0.0.1:8000/api/health/ready/
+          for attempt in {1..30}; do curl -fsS http://127.0.0.1:5173/ && break; sleep 1; done
+          curl -fsS http://127.0.0.1:5173/
+          pnpm test:e2e
+      - name: Container builds
+        run: |
+          docker build backend
+          docker build frontend

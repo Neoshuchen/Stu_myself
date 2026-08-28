@@ -1,0 +1,36 @@
+services:
+  ai-redis:
+    image: public.ecr.aws/docker/library/redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    security_opt:
+      - no-new-privileges:true
+
+  release:
+    environment:
+      AI_CREDENTIAL_ENCRYPTION_KEY_FILE: /run/secrets/ai_credential_encryption_key
+      AI_REDIS_URL: redis://ai-redis:6379/0
+    secrets:
+      - ai_credential_encryption_key
+    depends_on:
+      ai-redis:
+        condition: service_healthy
+
+  backend:
+    environment:
+      AI_CREDENTIAL_ENCRYPTION_KEY_FILE: /run/secrets/ai_credential_encryption_key
+      AI_REDIS_URL: redis://ai-redis:6379/0
+    secrets:
+      - ai_credential_encryption_key
+    depends_on:
+      ai-redis:
+        condition: service_healthy
+
+secrets:
+  ai_credential_encryption_key:
+    file: ./secrets/ai_credential_encryption_key

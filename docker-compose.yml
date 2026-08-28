@@ -1,0 +1,179 @@
+name: study-myself
+
+x-backend-build: &backend-build
+  context: ./backend
+  args:
+    PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+
+x-backend-environment: &backend-environment
+  DJANGO_ENV: production
+  DJANGO_DEBUG: "0"
+  DJANGO_SECURE_SSL: "1"
+  DJANGO_SECRET_KEY_FILE: /run/secrets/django_secret_key
+  DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:?请配置正式域名}
+  CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:?请配置 HTTPS 正式来源}
+  CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+  MYSQL_DATABASE: ${MYSQL_DATABASE:-zhixu}
+  MYSQL_USER: ${MYSQL_USER:-zhixu}
+  MYSQL_PASSWORD_FILE: /run/secrets/mysql_password
+  MYSQL_HOST: db
+  MYSQL_PORT: "3306"
+  MYSQL_CONN_MAX_AGE: ${MYSQL_CONN_MAX_AGE:-60}
+  REDIS_URL: redis://redis:6379/0
+  AI_ASSISTANT_ENABLED: ${AI_ASSISTANT_ENABLED:-0}
+  AI_REDIS_URL: ${AI_REDIS_URL:-redis://redis:6379/0}
+  AI_CUSTOM_ALLOWED_HOSTS: ${AI_CUSTOM_ALLOWED_HOSTS:-}
+  AI_OPENAI_MODELS: ${AI_OPENAI_MODELS:-gpt-5.6-luna,gpt-5.6-terra}
+  AI_ANTHROPIC_MODELS: ${AI_ANTHROPIC_MODELS:-claude-haiku-4-5,claude-sonnet-5}
+  AI_REQUEST_TIMEOUT_SECONDS: ${AI_REQUEST_TIMEOUT_SECONDS:-45}
+  AI_PROVIDER_RESPONSE_MAX_BYTES: ${AI_PROVIDER_RESPONSE_MAX_BYTES:-8388608}
+  AI_CONTEXT_CACHE_TTL_SECONDS: ${AI_CONTEXT_CACHE_TTL_SECONDS:-900}
+  AI_ATTACHMENT_CACHE_TTL_SECONDS: ${AI_ATTACHMENT_CACHE_TTL_SECONDS:-3600}
+  AI_CONTEXT_CHAR_BUDGET: ${AI_CONTEXT_CHAR_BUDGET:-32000}
+  AI_MESSAGE_MAX_CHARS: ${AI_MESSAGE_MAX_CHARS:-6000}
+  AI_RESPONSE_MAX_CHARS: ${AI_RESPONSE_MAX_CHARS:-50000}
+  AI_ATTACHMENT_MAX_BYTES: ${AI_ATTACHMENT_MAX_BYTES:-4194304}
+  AI_ATTACHMENT_MAX_FILES: ${AI_ATTACHMENT_MAX_FILES:-2}
+  AI_ATTACHMENT_TEXT_MAX_CHARS: ${AI_ATTACHMENT_TEXT_MAX_CHARS:-12000}
+  AI_PDF_MAX_PAGES: ${AI_PDF_MAX_PAGES:-20}
+  AI_IMAGE_CONTEXT_MAX_BYTES: ${AI_IMAGE_CONTEXT_MAX_BYTES:-8388608}
+  THROTTLE_AI_CHAT: ${THROTTLE_AI_CHAT:-30/min}
+  THROTTLE_AI_CREDENTIAL: ${THROTTLE_AI_CREDENTIAL:-10/hour}
+  EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.smtp.EmailBackend}
+  EMAIL_HOST: ${EMAIL_HOST:-}
+  EMAIL_PORT: ${EMAIL_PORT:-587}
+  EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+  EMAIL_HOST_PASSWORD_FILE: /run/secrets/email_host_password
+  EMAIL_USE_TLS: ${EMAIL_USE_TLS:-1}
+  DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-知序 <noreply@example.com>}
+  TENCENT_SES_SECRET_ID_FILE: /run/secrets/tencent_ses_secret_id
+  TENCENT_SES_SECRET_KEY_FILE: /run/secrets/tencent_ses_secret_key
+  TENCENT_SES_REGION: ${TENCENT_SES_REGION:-ap-hongkong}
+  TENCENT_SES_TEMPLATE_ID: ${TENCENT_SES_TEMPLATE_ID:-0}
+  EMAIL_CODE_TTL_SECONDS: ${EMAIL_CODE_TTL_SECONDS:-600}
+  EMAIL_CODE_COOLDOWN_SECONDS: ${EMAIL_CODE_COOLDOWN_SECONDS:-60}
+  EMAIL_CODE_IP_LIMIT_PER_HOUR: ${EMAIL_CODE_IP_LIMIT_PER_HOUR:-20}
+  INVITE_ONLY_REGISTRATION: ${INVITE_ONLY_REGISTRATION:-1}
+  MEDIA_URL_TTL_SECONDS: ${MEDIA_URL_TTL_SECONDS:-600}
+  DJANGO_HSTS_SECONDS: ${DJANGO_HSTS_SECONDS:-3600}
+  DJANGO_HSTS_INCLUDE_SUBDOMAINS: ${DJANGO_HSTS_INCLUDE_SUBDOMAINS:-0}
+  DJANGO_HSTS_PRELOAD: ${DJANGO_HSTS_PRELOAD:-0}
+  DJANGO_LOG_LEVEL: ${DJANGO_LOG_LEVEL:-INFO}
+
+x-backend-secrets: &backend-secrets
+  - django_secret_key
+  - mysql_password
+  - email_host_password
+  - tencent_ses_secret_id
+  - tencent_ses_secret_key
+
+services:
+  db:
+    image: public.ecr.aws/docker/library/mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-zhixu}
+      MYSQL_USER: ${MYSQL_USER:-zhixu}
+      MYSQL_PASSWORD_FILE: /run/secrets/mysql_password
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_password
+      TZ: Asia/Shanghai
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    secrets:
+      - mysql_password
+      - mysql_root_password
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$$(cat /run/secrets/mysql_root_password) mysqladmin ping -h localhost -uroot --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    security_opt:
+      - no-new-privileges:true
+
+  redis:
+    image: public.ecr.aws/docker/library/redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    security_opt:
+      - no-new-privileges:true
+
+  release:
+    build: *backend-build
+    profiles: ["release"]
+    environment: *backend-environment
+    secrets: *backend-secrets
+    command: sh -c "python manage.py migrate --noinput && python manage.py import_curated_roadmaps && python manage.py collectstatic --noinput"
+    volumes:
+      - static_data:/app/staticfiles
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  backend:
+    build: *backend-build
+    restart: unless-stopped
+    environment: *backend-environment
+    secrets: *backend-secrets
+    volumes:
+      - ./backend/media:/app/media
+      - static_data:/app/staticfiles:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os, urllib.request; host = os.environ['DJANGO_ALLOWED_HOSTS'].split(',')[0].strip(); request = urllib.request.Request('http://127.0.0.1:8000/api/health/ready/', headers={'Host': host, 'X-Forwarded-Proto': 'https'}); urllib.request.urlopen(request, timeout=5)"]
+      interval: 15s
+      timeout: 7s
+      retries: 5
+      start_period: 20s
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "${APP_BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-8080}:8080"
+    volumes:
+      - ./backend/media:/var/www/media:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/"]
+      interval: 15s
+      timeout: 7s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  mysql_data:
+  static_data:
+
+secrets:
+  django_secret_key:
+    file: ./secrets/django_secret_key
+  mysql_password:
+    file: ./secrets/mysql_password
+  mysql_root_password:
+    file: ./secrets/mysql_root_password
+  email_host_password:
+    file: ./secrets/email_host_password
+  tencent_ses_secret_id:
+    file: ./secrets/tencent_ses_secret_id
+  tencent_ses_secret_key:
+    file: ./secrets/tencent_ses_secret_key
