@@ -43,6 +43,7 @@ class _NoRedirectHandler(HTTPRedirectHandler):
 HTTP_OPENER = build_opener(_NoRedirectHandler())
 MAX_RECORDED_TOKEN_COUNT = 2_147_483_647
 MAX_PROVIDER_URL_CHARS = 500
+MAX_PROVIDER_ERROR_BYTES = 4096
 SENSITIVE_QUERY_NAMES = {"api_key", "apikey", "key", "secret", "signature", "token"}
 ADAPTER_ENDPOINT_PATHS = {
     "openai_chat_completions": "/chat/completions",
@@ -110,10 +111,32 @@ def provider_endpoint_url(value, adapter):
     return validate_public_https_url(urlunsplit(parsed._replace(path=path)))
 
 
-def _upstream_error(status_code):
-    """把供应商状态码转换为不包含响应正文和用户数据的安全错误。"""
-    if status_code in (401, 403):
-        return ProviderError("API Key 无效、无权限或供应商拒绝访问。", status_code=400, code="invalid_api_key")
+def _upstream_error(status_code, raw_body=b""):
+    """把供应商状态和已知错误代码转换为不泄露正文的安全错误。"""
+    provider_code = ""
+    try:
+        payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
+        if isinstance(payload, dict):
+            nested_error = payload.get("error")
+            provider_code = payload.get("code") or (
+                nested_error.get("code") if isinstance(nested_error, dict) else ""
+            )
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        pass
+    if str(provider_code).upper() == "ACCOUNT_SUSPENDED":
+        return ProviderError(
+            "模型供应商账号已临时冻结，请在供应商控制台检查账号状态、额度，或切换其他配置。",
+            status_code=400,
+            code="provider_account_suspended",
+        )
+    if status_code == 401:
+        return ProviderError("API Key 无效或已失效，请更新模型配置。", status_code=400, code="invalid_api_key")
+    if status_code == 403:
+        return ProviderError(
+            "模型供应商拒绝访问，请检查账号状态、额度和模型权限。",
+            status_code=400,
+            code="provider_forbidden",
+        )
     if status_code == 429:
         return ProviderError("模型供应商正在限流，请稍后重试。", status_code=429, code="rate_limited")
     if status_code == 400:
@@ -142,7 +165,12 @@ def _request_json(url, headers, payload=None, *, require_public_url=False):
             if len(raw) > settings.AI_PROVIDER_RESPONSE_MAX_BYTES:
                 raise ProviderError("模型供应商返回的数据过大。", code="provider_response_too_large")
     except HTTPError as exc:
-        raise _upstream_error(exc.code) from exc
+        # 只读取少量错误正文并匹配已知代码；原始供应商消息不会进入响应或日志。
+        try:
+            error_body = exc.read(MAX_PROVIDER_ERROR_BYTES)
+        except (OSError, ValueError):
+            error_body = b""
+        raise _upstream_error(exc.code, error_body) from exc
     except (URLError, TimeoutError, socket.timeout, OSError) as exc:
         raise ProviderError("连接模型供应商超时或网络不可用。", status_code=504, code="provider_timeout") from exc
     try:

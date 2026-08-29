@@ -11,7 +11,8 @@
 - 小队扩充第一阶段：邀请制小队、周契约、共享进度、知识缺口朋友验证、通知和真实活动日历。
 - 小队扩充第二阶段：多人分工协作挑战、证据合并结算和个人周成果卡。
 - 全局 AI 学习助手：采用会话侧栏、紧凑模型栏和底部输入区；用户可按账号加密保存、编辑和切换多条 OpenAI 兼容 / Responses / Anthropic 模型服务，支持 OpenCode 风格 Base URL、4/8/12 轮上下文，以及选择或直接粘贴图片并读取 PDF、文本和源码。附件发送前可单独移除或整体替换，Enter 发送、Shift+Enter 换行；提交后输入框立即清空，问题先进入对话区，失败时恢复未发送内容。
-- 2026-08-28 验证基线：99 项后端测试通过（含 31 项 AI 边界测试），迁移无遗漏且本地 MySQL 已应用到 `0016`；4 项 Playwright/Chromium 浏览器测试通过，实际完成普通用户报名、进入学习日、社区发帖/评论/点赞、小队创建、全局 AI 配置入口、剪贴板图片上传、发送控件命中与管理员隔离；前端构建、依赖检查、真实 Redis 和完整生产安全参数检查均通过。真实供应商调用和部署机 Compose 流程仍需使用轮换后的低权限 Key 及 Docker 环境验收。
+- AI 辅助 Markdown 路线：用户可在创建路线时一次上传多个完整 `.md`、选择已有或新增账号模型配置，先查看知识主题、缺口、假设和风险，再编辑或放弃模型草稿；确认后可保存、加入个人规划或提交管理员公开审核。预览不落库，原始文档和模型原始响应不持久化。
+- 2026-08-29 验证基线：107 项后端测试与 5 项 Playwright/Chromium 浏览器测试全部通过；迁移无遗漏，前端生产构建、真实 MySQL/Redis 启动和关键权限流程可用。浏览器已覆盖新增长期模型配置、多 Markdown 上传、诊断回填与私有草稿保存；真实供应商调用和部署机 Compose 流程仍需使用轮换后的低权限 Key 及 Docker 环境验收。
 
 针对“几位朋友互相督促、按路线长期学习”的目标，当前能力已经达标。系统仍不是全自动教学或考试平台：固定授权实验资产、客观自动判题、内容版本回滚、管理质量看板、前端单元测试和更深的多用户浏览器流程仍待建设。课程事实和剩余边界见 [`课程内容质量与后续改进`](./docs/课程内容质量与后续改进.md)。
 
@@ -26,7 +27,7 @@
 | [`隐私与社区治理基线`](./docs/隐私与社区治理基线.md) | 用户数据、AI 第三方处理和社区处置规则 |
 | [`Git 版本管理与提交指南`](./docs/Git版本管理与提交指南.md) | 首次建仓、提交审查和后续分支发布 |
 | [`第四阶段规划`](./docs/第四阶段-上线前规模化能力开发规划.md) | 达到真实用户量与运营前置条件后才启动的能力 |
-| [`AI 辅助 Markdown 路线生成规划`](./docs/AI辅助Markdown学习路线生成规划.md) | 尚未开发且仍有价值的后续方案 |
+| [`AI 辅助 Markdown 路线生成设计`](./docs/AI辅助Markdown学习路线生成规划.md) | 已实现功能的数据流、接口、安全边界和验收记录 |
 
 ## 整体架构
 
@@ -85,7 +86,7 @@ backend/learning/
 | 领域 | 主要职责 | 代表数据或接口 |
 |---|---|---|
 | `accounts` | CSRF 会话建立、注册、登录、刷新、退出、邮箱验证、个人资料 | `/api/auth/*` |
-| `study` | 路线、报名、逐日学习、证据、缺口、复习、成长、洞察、导出 | `LearningPlan`、`Enrollment`、`DayProgress`、`Evidence`、`Gap` |
+| `study` | 路线、Markdown AI 预览、报名、逐日学习、证据、缺口、复习、成长、洞察、导出 | `LearningPlan`、`Enrollment`、`DayProgress`、`Evidence`、`Gap` |
 | `collaboration` | 小队、周契约、协作挑战、通知、互评、答疑、搭子 | `StudyGroup`、`WeeklyContract`、`TeamChallenge`、`PeerReview` |
 | `community` | 帖子、图片、评论、点赞、问题状态和举报 | `CommunityPost`、`CommunityComment`、`CommunityReport` |
 | `ai` | 供应商白名单、BYOK、课程上下文、多模态消息与可丢失缓存 | `/api/ai/providers/`、`/api/ai/credentials/`、`/api/ai/chats/` |
@@ -133,6 +134,7 @@ frontend/src/
 | 小队、契约、挑战和通知 | MySQL | 权限由小队成员关系约束；结算采用事务和数据库唯一约束 |
 | AI 会话文字、配置和附件元数据 | MySQL | 作为用户可删除的对话记录；不保存附件正文、图片本体或 API Key 明文 |
 | AI 最近文本上下文、限时附件内容和请求锁 | Redis `ai` 缓存 | 可淘汰、可重建；图片和文件内容到期或重启后不再进入后续轮次，绝不是聊天权威存储 |
+| Markdown 路线生成预览 | 当前请求与浏览器内存 | 原始 Markdown、诊断和未确认草稿不落库；只有用户确认后才写入现有路线表 |
 | 邮箱验证码、限流和缓存 | Redis | 可丢弃短期状态；Redis 不可用时就绪探针失败，生产实例不应接收流量 |
 | 附件与图片 | media 存储 | 数据库只存文件字段；外部访问必须经过短时签名接口 |
 | access token | 浏览器内存 | 刷新页面后由 HttpOnly refresh Cookie 轮换恢复，不写 localStorage |
@@ -225,6 +227,19 @@ frontend/src/
 
 新建全局会话不会自动绑定或读取每日课程、复盘、证据和缺口；旧版已经关联学习日的会话仍可继续读取当时的最小课程快照。AI 不修改知识检查、验收项、证据、缺口或完成状态。供应商失败时不写入半条消息；输出按纯文本展示，不执行 HTML、脚本、模型工具调用或上传文件中的指令。
 
+### 8. AI 辅助 Markdown 路线
+
+```text
+创建路线 → 上传一个或多个完整 Markdown → 选择已有配置或从全局助手新增长期配置
+  → POST /api/my-plans/markdown-preview/ 调用模型并校验结构
+  → 查看诊断、修改逐日草稿或放弃
+  → 用户确认后复用现有接口保存私有路线
+      ├─ 加入自己的学习规划
+      └─ 提交管理员审核，通过后进入公开路线
+```
+
+Markdown 和学习目标都作为不可信模型数据处理；截断文档、他人凭据、无效模型结构和供应商失败都不会创建路线。首版支持 1～30 天，未引入任务队列、专用路线模型或第二套社区。
+
 ## 主要页面与 API 分区
 
 | 场景 | 前端页面 | 后端接口分区 |
@@ -232,6 +247,7 @@ frontend/src/
 | 今日学习与路线 | `/dashboard`、`/plans`、`/journey`、`/learn/...` | `/api/dashboard/`、`/api/plans/`、`/api/enrollments/`、`/api/progress/` |
 | 证据、缺口、复习 | 学习页、`/review`、`/insights` | `/api/evidence/`、`/api/gaps/`、`/api/reviews/`、`/api/insights/` |
 | AI 学习助手 | 所有登录页面的全局浮动入口 | `/api/ai/providers/`、`/api/ai/credentials/`、`/api/ai/chats/` |
+| AI Markdown 路线 | `/plans/new` | `/api/my-plans/markdown-preview/`、`/api/my-plans/`、路线报名与审核接口 |
 | 社区 | `/community`、帖子编辑与详情页 | `/api/community/posts/`、`comments/`、`reports/` |
 | 互助 | `/mutual-help` | `/api/peer-reviews/`、`help-sessions/`、`buddy-profiles/` |
 | 小队 | `/team` | `/api/study-groups/`、`weekly-contracts/`、`team-challenges/` |
@@ -263,9 +279,9 @@ frontend/src/
 - Compose 中 Django 和 Nginx 以非 root 用户运行，后端只读根文件系统并启用 `no-new-privileges`；密钥通过 Docker secrets 文件注入。
 - `/api/health/live/` 只检查进程；`/api/health/ready/` 同时验证 MySQL 和 Redis，避免依赖失效的实例继续接收流量。
 
-### 2026-08-28 实际检查结果
+### 2026-08-29 实际检查结果
 
-后端 99/99、AI 专项 31 项和 Playwright/Chromium 4/4 均通过；迁移、前端构建、依赖检查、真实 MySQL/Redis 冒烟和完整生产安全参数检查通过。Docker、真实邮件、轮换后的第三方模型 Key、TLS、备份恢复和外部告警仍须在对应环境验收。完整命令、权限矩阵与边界统一记录在 [`全功能回归验收记录`](./docs/全功能回归验收记录-2026-08-28.md)，README 不再维护第二份结果表。
+后端 105/105、Playwright/Chromium 5/5 均通过；迁移检查、前端生产构建、真实 MySQL/Redis 启动和关键浏览器流程通过。Docker、真实邮件、轮换后的第三方模型 Key、TLS、备份恢复和外部告警仍须在对应环境验收。完整命令、权限矩阵与边界统一记录在 [`全功能回归验收记录`](./docs/全功能回归验收记录-2026-08-28.md)，README 不再维护第二份结果表。
 
 ## 本地开发
 
@@ -292,6 +308,8 @@ conda activate Study_myself
 本地 `Study_myself` 环境已于 2026-08-28 配置独立主密钥并应用 `learning.0016`；不要再次生成并覆盖该值，否则已经保存的 Key 将无法解密。主密钥不得提交仓库或与 Django `SECRET_KEY` 共用。
 
 新建全局会话使用用户填写的模型名和公网 HTTPS Base URL。以 OpenAI 兼容协议为例，填写 `https://provider.example/v1` 即可，后端会补成 `/v1/chat/completions`；原来保存的完整请求地址仍然兼容。该行为与 [OpenCode 的 OpenAI-compatible 配置](https://opencode.ai/docs/providers) 和 [AI SDK 的 Base URL 契约](https://ai-sdk.dev/providers/openai-compatible-providers) 一致。`AI_OPENAI_MODELS`、`AI_ANTHROPIC_MODELS` 仅继续服务没有自定义地址的旧会话。服务端每次保存和调用前都会解析域名并拒绝非公网地址，生产环境还可用逗号分隔的 `AI_CUSTOM_ALLOWED_HOSTS` 只允许指定供应商域名，并应配合容器/防火墙出站策略防御 DNS 重绑定。默认单次最多 2 个、每个 4MB 的图片/PDF/文本/源码附件；图片会清除元数据，PDF 只读前 20 页，附件正文默认在 Redis 中最长缓存 1 小时。较大上传在请求处理期间可能进入 Django 临时上传文件，生产容器的 `/tmp` 是 tmpfs，请求结束后清理且不会进入 media 或备份。Redis 缓存会占用内存而不是“零存储”；多用户部署应通过 `AI_REDIS_URL` 使用独立、受容量限制的实例。
+
+供应商调用失败时，先在模型配置中重新执行连接测试。`API Key 无效` 表示需要更新密钥；`账号已临时冻结` 表示供应商账号状态或额度异常，本地系统无法解除，需要前往供应商控制台处理或切换其他配置；普通权限拒绝还应核对所选模型是否对该账号开放。上游原始错误正文不会返回浏览器或写入日志。
 
 在MySQL中创建 `zhixu` 数据库和最小权限账号后，将连接参数保存到Conda环境：
 
@@ -374,7 +392,7 @@ bash deployment/deploy.sh
 
 ## 课程导入
 
-系统课程正文保存在版本化目录 `backend/data/system_roadmaps.v2.json`，当前内容版本为 5，其中 Python 课程与示例以 3.12 为内容基线；生产镜像和新建 Conda 环境使用 Python 3.13，可正常覆盖该课程基线。五条 60 日路线的逐日课件和正文核验记录位于 `docs/详细学习课件/`，课件与系统正文由同一目录生成，学习者参考资料只保留公开官方文档。导入命令会校验内容版本、课程分类和私有资料地址，并使用 `update_or_create` 幂等更新全部六条路线：
+系统课程正文保存在版本化目录 `backend/data/system_roadmaps.v2.json`，当前内容版本为 5，其中 Python 课程与示例以 3.12 为内容基线；生产镜像和新建 Conda 环境使用 Python 3.13，可正常覆盖该课程基线。十一条 60 日路线的逐日课件和正文核验记录位于 `docs/详细学习课件/`，课件与系统正文由同一目录生成，学习者参考资料只保留公开官方文档。导入命令会校验内容版本、课程分类和私有资料地址，并使用 `update_or_create` 幂等更新全部十二条路线：
 
 ```powershell
 python backend/manage.py import_curated_roadmaps

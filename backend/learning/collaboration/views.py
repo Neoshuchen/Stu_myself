@@ -100,6 +100,8 @@ class StudyGroupViewSet(
         group = self.get_object()
         week_start = current_week_start()
         week_end = week_start + timedelta(days=6)
+        start_at = timezone.make_aware(datetime.combine(week_start, time.min))
+        end_at = start_at + timedelta(days=7)
         members = list(group.members.all().order_by("username"))
         contracts = {
             item.user_id: item
@@ -114,7 +116,9 @@ class StudyGroupViewSet(
                 completed = DayProgress.objects.filter(
                     enrollment=contract.enrollment,
                     status=DayProgress.Status.COMPLETED,
-                    completed_at__date__range=(week_start, week_end),
+                    # 使用时间范围避免依赖 MySQL 时区表执行日期转换。
+                    completed_at__gte=start_at,
+                    completed_at__lt=end_at,
                 ).count()
             activity = activity_summary(member)
             member_payload.append({

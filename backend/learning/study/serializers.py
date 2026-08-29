@@ -2,11 +2,13 @@
 
 from pathlib import Path
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
 
 from ..models import (
+    AIProviderCredential,
     Contribution,
     DayProgress,
     Enrollment,
@@ -315,6 +317,45 @@ class CustomLearningPlanSerializer(serializers.ModelSerializer):
         ]
 
 
+class MarkdownRoadmapPreviewSerializer(serializers.Serializer):
+    """校验一次多 Markdown 路线生成请求及当前用户选择的长期模型配置。"""
+
+    files = serializers.ListField(
+        child=serializers.FileField(),
+        allow_empty=False,
+        max_length=settings.AI_ATTACHMENT_MAX_FILES,
+    )
+    credential = serializers.PrimaryKeyRelatedField(queryset=AIProviderCredential.objects.none())
+    target_days = serializers.IntegerField(min_value=1, max_value=30, default=14)
+    daily_minutes = serializers.IntegerField(min_value=15, max_value=240, default=60)
+    learner_background = serializers.CharField(required=False, allow_blank=True, max_length=500, trim_whitespace=True)
+    goal = serializers.CharField(required=False, allow_blank=True, max_length=500, trim_whitespace=True)
+    allow_supplement = serializers.BooleanField(default=False)
+
+    def __init__(self, *args, **kwargs):
+        """把可选配置限制为当前登录用户，避免跨账号对象枚举。"""
+        super().__init__(*args, **kwargs)
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            self.fields["credential"].queryset = AIProviderCredential.objects.filter(user=request.user)
+
+    def validate_files(self, value):
+        """只允许 Markdown 文件列表进入现有附件安全处理层。"""
+        invalid = next(
+            (item.name for item in value if Path(item.name or "").suffix.lower() != ".md"),
+            None,
+        )
+        if invalid:
+            raise serializers.ValidationError(f"文件 {invalid} 不是 .md Markdown 文件。")
+        return value
+
+    def validate_credential(self, value):
+        """路线生成必须绑定一个明确模型，避免旧配置调用空模型名。"""
+        if not value.model:
+            raise serializers.ValidationError("所选模型配置缺少模型名称，请先编辑并重新验证。")
+        return value
+
+
 class EvidenceSerializer(serializers.ModelSerializer):
     """校验并输出学习证据及受保护附件。"""
 
@@ -557,4 +598,3 @@ class ContributionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Contribution
         fields = ("id", "kind", "title", "detail", "created_at")
-

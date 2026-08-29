@@ -31,6 +31,7 @@ from .study.views import (
     LearningExportView,
     LearningInsightsView,
     LearningPlanViewSet,
+    MarkdownRoadmapPreviewView,
     ReviewCenterView,
 )
 from .system.views import LiveHealthView, ProtectedMediaView, ReadyHealthView
@@ -71,6 +72,7 @@ urlpatterns = [
     path("auth/me/", MeView.as_view(), name="me"),
     path("ai/providers/", AIProviderCatalogView.as_view(), name="ai-providers"),
     path("ai/credentials/test/", AICredentialTestView.as_view(), name="ai-credential-test"),
+    path("my-plans/markdown-preview/", MarkdownRoadmapPreviewView.as_view(), name="markdown-roadmap-preview"),
     path("dashboard/", DashboardView.as_view(), name="dashboard"),
     path("insights/export/", LearningExportView.as_view(), name="learning_export"),
     path("insights/", LearningInsightsView.as_view(), name="insights"),

@@ -32,6 +32,7 @@ test('匿名访问受保护页面时回到登录页', async ({ page }) => {
 })
 
 test.describe('普通学习者', () => {
+  test.describe.configure({ mode: 'serial' })
   test.skip(!learner.username || !learner.password, '需要提供 E2E_USER 与 E2E_PASSWORD。')
 
   test('可访问核心功能、不能进入管理中心并能打开全局 AI 配置', async ({ page }) => {
@@ -197,6 +198,140 @@ test.describe('普通学习者', () => {
     await input.press('Enter')
     await enterRequest
     await expect(page.getByText('回车发送已收到。')).toBeVisible()
+  })
+
+  test('可新增账号模型配置并把 Markdown 路线保存为私有草稿', async ({ page }) => {
+    await login(page, learner)
+    let savedCredentials = []
+    const credential = {
+      id: 77,
+      name: '路线规划模型',
+      provider: 'openai',
+      adapter: 'openai_chat_completions',
+      api_url: 'https://provider.example/v1/chat/completions',
+      model: 'deepseek-v4-flash',
+      key_last_four: 'test',
+    }
+    const days = [1, 2].map((number) => ({
+      day_number: number,
+      phase: '基础阶段',
+      week_number: 1,
+      week_title: '第 1 周',
+      title: `主题 ${number}`,
+      core_knowledge: `知识 ${number}`,
+      hands_on_task: `完成任务 ${number}`,
+      acceptance_criteria: [`结果 ${number} 可以复现`],
+      estimated_minutes: 60,
+    }))
+    const draft = {
+      title: 'Markdown 生成路线',
+      subtitle: '从资料到可验证实践',
+      summary: '根据上传资料生成并由用户确认的学习路线。',
+      audience: 'Python 初学者',
+      days,
+    }
+    let previewRequestBody = ''
+
+    await page.route('**/api/ai/providers/', (route) => route.fulfill({
+      json: {
+        enabled: true,
+        credential_storage_available: true,
+        attachment_cache_ttl_seconds: 3600,
+        attachment_max_files: 2,
+        attachment_max_bytes: 4 * 1024 * 1024,
+        providers: [{ id: 'openai', name: 'OpenAI 兼容', models: ['deepseek-v4-flash'], supports_images: true }],
+      },
+    }))
+    await page.route('**/api/ai/chats/', (route) => route.fulfill({ json: [] }))
+    await page.route('**/api/ai/credentials/', async (route) => {
+      if (route.request().method() === 'POST') {
+        savedCredentials = [credential]
+        return route.fulfill({ status: 201, json: credential })
+      }
+      return route.fulfill({ json: savedCredentials })
+    })
+    await page.route('**/api/my-plans/markdown-preview/', (route) => {
+      previewRequestBody = route.request().postData() || ''
+      return route.fulfill({ json: {
+        provider: { credential: 77, name: credential.name, model: credential.model },
+        source: { filename: '2 个 Markdown 文件', characters: 78 },
+        sources: [
+          { filename: 'python-notes.md', characters: 48 },
+          { filename: 'python-practice.md', characters: 30 },
+        ],
+        usage: { input_tokens: 120, output_tokens: 80 },
+        diagnosis: {
+          topics: ['Python 变量与函数'],
+          gaps: ['缺少异常处理资料'],
+          assumptions: ['本机可以运行 Python'],
+          warnings: [],
+        },
+        draft,
+      } })
+    })
+    await page.route('**/api/my-plans/', (route) => route.fulfill({ status: 201, json: { ...draft, id: 901, slug: 'generated-roadmap' } }))
+    await page.route('**/api/plans/generated-roadmap/', (route) => route.fulfill({
+      json: {
+        ...draft,
+        id: 901,
+        slug: 'generated-roadmap',
+        total_days: 2,
+        estimated_weeks: 1,
+        accent_start: '#3b7d6b',
+        accent_end: '#ef8354',
+        owned: true,
+        enrolled: false,
+        editable: true,
+        is_published: false,
+        review_status: 'draft',
+        review_note: '',
+        forked_from: null,
+        my_enrollment: null,
+        my_feedback: null,
+        feedback_summary: { count: 0, clarity: 0, practicality: 0 },
+      },
+    }))
+
+    await page.goto('/plans/new')
+    await expect(page.getByText('AI 从 Markdown 生成')).toBeVisible()
+    await page.getByRole('button', { name: '＋ 新增模型配置' }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+    await dialog.getByLabel('配置名称').fill(credential.name)
+    await dialog.getByLabel('模型名称').fill(credential.model)
+    await dialog.getByLabel('API Base URL').fill('https://provider.example/v1')
+    await dialog.getByLabel('API Key').fill('temporary-test-key')
+    await dialog.getByRole('button', { name: '验证、保存并使用' }).click()
+    await expect(dialog.locator('.ai-model-bar').getByText(credential.name, { exact: true })).toBeVisible()
+    await dialog.getByRole('button', { name: '关闭学习助手' }).click()
+    await expect(page.getByLabel('模型配置')).toHaveValue('77')
+
+    await page.getByLabel('Markdown 学习资料').setInputFiles([
+      {
+        name: 'python-notes.md',
+        mimeType: 'text/markdown',
+        buffer: Buffer.from('# Python\n\n理解变量、函数。'),
+      },
+      {
+        name: 'python-practice.md',
+        mimeType: 'text/markdown',
+        buffer: Buffer.from('# 实践\n\n完成一个小脚本。'),
+      },
+    ])
+    await expect(page.getByText('已选择 2 个 Markdown 文件')).toBeVisible()
+    await page.getByLabel('目标天数').fill('2')
+    await page.getByRole('button', { name: '生成学习路线草稿' }).click()
+    expect(previewRequestBody).toContain('python-notes.md')
+    expect(previewRequestBody).toContain('python-practice.md')
+    await expect(page.getByText('Python 变量与函数')).toBeVisible()
+    await expect(page.getByText('路线草稿已生成并回填，但尚未保存。')).toBeVisible()
+    await expect(page.getByLabel('路线名称')).toHaveValue(draft.title)
+    await expect(page.getByLabel('验收标准').nth(1)).toHaveValue('结果 2 可以复现')
+
+    await page.getByRole('button', { name: '仅保存草稿' }).click()
+    await expect(page).toHaveURL(/\/plans\/generated-roadmap$/)
+    await expect(page.getByRole('heading', { name: draft.title })).toBeVisible()
+    await expect(page.getByText('这是你的草稿。完善后可提交管理员审核，也可以直接加入自己的学习路径。')).toBeVisible()
   })
 })
 

@@ -2,6 +2,7 @@
 
 import io
 from unittest.mock import Mock, patch
+from urllib.error import HTTPError
 
 from cryptography.fernet import Fernet
 from django.conf import settings
@@ -548,6 +549,35 @@ class AIAttachmentTests(TestCase):
 
 class AIProviderBoundaryTests(TestCase):
     """验证模型供应商响应在反序列化前受到硬边界保护。"""
+
+    @patch("learning.ai.providers.HTTP_OPENER")
+    def test_provider_access_errors_are_actionable_without_exposing_raw_body(self, opener):
+        """区分无效密钥、账号冻结和其他权限拒绝，同时不回传任意上游正文。"""
+        cases = (
+            (401, b'{"message":"secret detail"}', "invalid_api_key", "API Key"),
+            (
+                403,
+                b'{"code":"ACCOUNT_SUSPENDED","message":"secret detail"}',
+                "provider_account_suspended",
+                "临时冻结",
+            ),
+            (403, b'{"message":"secret detail"}', "provider_forbidden", "模型权限"),
+        )
+        for status_code, body, expected_code, expected_message in cases:
+            with self.subTest(status_code=status_code, expected_code=expected_code):
+                opener.open.side_effect = HTTPError(
+                    "https://model.example/v1/chat/completions",
+                    status_code,
+                    "upstream error",
+                    {},
+                    io.BytesIO(body),
+                )
+                with self.assertRaises(ProviderError) as caught:
+                    _request_json("https://model.example/v1/chat/completions", {}, {})
+                self.assertEqual(caught.exception.code, expected_code)
+                self.assertEqual(caught.exception.status_code, 400)
+                self.assertIn(expected_message, caught.exception.user_message)
+                self.assertNotIn("secret detail", caught.exception.user_message)
 
     @override_settings(AI_REQUEST_TIMEOUT_SECONDS=5, AI_PROVIDER_RESPONSE_MAX_BYTES=4)
     @patch("learning.ai.providers.HTTP_OPENER")

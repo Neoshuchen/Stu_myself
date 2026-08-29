@@ -546,9 +546,31 @@ pre, code { font-family: var(--font-mono); }
 .editor-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; padding: 27px 28px; }
 .editor-fields label { display: grid; gap: 8px; color: var(--ink-soft); font-size: 11px; font-weight: 650; }
 .editor-fields .full { grid-column: 1 / -1; }
-.editor-fields input, .editor-fields textarea { width: 100%; padding: 12px 13px; color: var(--ink); background: var(--surface-strong); border: 1px solid var(--line-strong); border-radius: 8px; outline: 0; font-size: 12px; line-height: 1.7; }
+.editor-fields input, .editor-fields textarea, .editor-fields select { width: 100%; padding: 12px 13px; color: var(--ink); background: var(--surface-strong); border: 1px solid var(--line-strong); border-radius: 8px; outline: 0; font-size: 12px; line-height: 1.7; }
 .editor-fields textarea { resize: vertical; }
-.editor-fields input:focus, .editor-fields textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
+.editor-fields input:focus, .editor-fields textarea:focus, .editor-fields select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
+.roadmap-generator > summary { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 22px 28px; background: var(--surface-soft); cursor: pointer; list-style: none; }
+.roadmap-generator > summary::-webkit-details-marker { display: none; }
+.roadmap-generator > summary span { display: grid; gap: 5px; }
+.roadmap-generator > summary b { font-size: 17px; }
+.roadmap-generator > summary small, .roadmap-generator > summary i { color: var(--muted); font-size: 11px; font-style: normal; }
+.roadmap-generator > summary i { color: var(--accent); font-weight: 700; }
+.roadmap-generator-body { border-top: 1px solid var(--line); }
+.roadmap-generator-fields { padding-bottom: 18px; }
+.roadmap-generator-fields label > small { color: var(--muted); font-weight: 400; line-height: 1.6; }
+.roadmap-config-action { display: flex; align-items: center; gap: 12px; padding-top: 18px; }
+.roadmap-config-action small { color: var(--muted); font-size: 10px; }
+.editor-fields .roadmap-checkbox { display: flex; grid-column: 1 / -1; flex-direction: row; align-items: start; font-weight: 500; line-height: 1.7; }
+.editor-fields .roadmap-checkbox input { flex: 0 0 auto; width: 16px; height: 16px; margin-top: 2px; padding: 0; accent-color: var(--accent); }
+.roadmap-generate-actions { display: flex; align-items: center; justify-content: space-between; gap: 22px; padding: 0 28px 24px; }
+.roadmap-generate-actions p { max-width: 650px; margin: 0; color: var(--muted); font-size: 10px; line-height: 1.7; }
+.roadmap-generator-body > .notice { margin: 0 28px 24px; }
+.roadmap-diagnosis-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 22px 28px; }
+.roadmap-diagnosis-grid article { padding: 17px; background: var(--surface-soft); border: 1px solid var(--line); border-radius: 10px; }
+.roadmap-diagnosis-grid h3 { margin: 0 0 9px; color: var(--accent); font-size: 12px; }
+.roadmap-diagnosis-grid ul { display: grid; gap: 7px; margin: 0; padding-left: 17px; color: var(--ink-soft); font-size: 11px; line-height: 1.7; }
+.roadmap-diagnosis-grid p { margin: 0; color: var(--muted); font-size: 11px; }
+.roadmap-diagnosis-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 28px 22px; color: var(--muted); font-size: 11px; }
 .editor-days { display: grid; gap: 14px; padding: 20px 28px 0; }
 .editor-day { overflow: hidden; border: 1px solid var(--line); border-radius: 12px; }
 .editor-day > header { display: flex; align-items: center; justify-content: space-between; padding: 13px 18px; background: var(--surface-soft); border-bottom: 1px solid var(--line); }
@@ -1228,6 +1250,11 @@ pre, code { font-family: var(--font-mono); }
   .editor-section-heading { grid-template-columns: 1fr; gap: 6px; padding: 20px; }
   .editor-fields { grid-template-columns: 1fr; padding: 20px; }
   .editor-fields .full { grid-column: auto; }
+  .roadmap-generator > summary { align-items: start; padding: 20px; }
+  .roadmap-config-action, .roadmap-generate-actions, .roadmap-diagnosis-actions { align-items: stretch; flex-direction: column; }
+  .roadmap-generate-actions, .roadmap-diagnosis-actions { padding-right: 20px; padding-left: 20px; }
+  .roadmap-generator-body > .notice { margin-right: 20px; margin-left: 20px; }
+  .roadmap-diagnosis-grid { grid-template-columns: 1fr; padding: 20px; }
   .editor-days { padding: 16px 16px 0; }
   .day-fields { padding: 18px; }
   .add-day { width: calc(100% - 32px); margin: 16px; }

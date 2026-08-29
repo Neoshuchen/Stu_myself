@@ -8,9 +8,20 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from ..ai.attachments import prepare_attachments
+from ..ai.providers import ProviderError, call_provider
+from ..ai.services import (
+    CredentialStorageUnavailable,
+    acquire_request_lock,
+    decrypt_api_key,
+    provider_config,
+    release_request_lock,
+    safety_identifier,
+)
 from ..models import (
     BuddyProfile,
     Contribution,
@@ -26,6 +37,13 @@ from ..models import (
 )
 from ..services import joined_enrollments, notify
 from .experience import activity_summary, growth_summary, review_center
+from .markdown_roadmaps import (
+    ROADMAP_MAX_OUTPUT_TOKENS,
+    RoadmapOutputError,
+    parse_roadmap_output,
+    roadmap_system_instruction,
+    roadmap_user_message,
+)
 from .serializers import (
     ContributionSerializer,
     CustomLearningPlanSerializer,
@@ -36,6 +54,7 @@ from .serializers import (
     JourneyDaySerializer,
     LearningPlanDetailSerializer,
     LearningPlanListSerializer,
+    MarkdownRoadmapPreviewSerializer,
     PlanDaySerializer,
     PlanFeedbackSerializer,
     ReviewAttemptSerializer,
@@ -43,6 +62,142 @@ from .serializers import (
 
 # 学习者可以提前查看的天数。预习是只读的：不建 DayProgress，也不能开始或完成。
 PREVIEW_DAYS = 5
+
+
+class MarkdownRoadmapPreviewView(APIView):
+    """使用当前用户保存的模型配置生成无持久化 Markdown 路线预览。"""
+
+    parser_classes = (MultiPartParser, FormParser)
+    throttle_scope = "ai_chat"
+
+    def post(self, request):
+        """读取多个完整 Markdown、调用一次模型并返回通过现有路线约束的草稿。"""
+        request_data = request.data.copy()
+        # 兼容多文件升级前的单数 file 字段，已有客户端无需与后端同步发布。
+        if "files" not in request_data and request.FILES.getlist("file"):
+            request_data.setlist("files", request.FILES.getlist("file"))
+        input_serializer = MarkdownRoadmapPreviewSerializer(data=request_data, context={"request": request})
+        input_serializer.is_valid(raise_exception=True)
+        values = input_serializer.validated_data
+        sources = prepare_attachments(values["files"])
+        invalid_source = next((item for item in sources if item.kind != "text" or not item.text.strip()), None)
+        if invalid_source:
+            return Response(
+                {
+                    "detail": f"Markdown 文件 {invalid_source.name} 没有可读取的文本。",
+                    "code": "invalid_markdown_file",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        truncated_source = next((item for item in sources if item.truncated), None)
+        if truncated_source:
+            return Response(
+                {
+                    "detail": f"Markdown 文件 {truncated_source.name} 超过完整读取限制，请拆分后重试。",
+                    "code": "markdown_too_large",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        lock_acquired = acquire_request_lock(request.user.pk)
+        if lock_acquired is None:
+            return Response(
+                {"detail": "AI 临时缓存当前不可用，请稍后重试。", "code": "ai_cache_unavailable"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        if not lock_acquired:
+            return Response(
+                {"detail": "已有一个 AI 请求正在处理中，请等待完成。", "code": "request_in_progress"},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        api_key = ""
+        try:
+            credential = values["credential"]
+            config = provider_config(
+                credential.provider,
+                credential.model,
+                credential.adapter,
+                credential.api_url,
+            )
+            api_key = decrypt_api_key(credential)
+            result = call_provider(
+                config,
+                api_key,
+                credential.model,
+                roadmap_system_instruction(),
+                [{
+                    "role": "user",
+                    "content": roadmap_user_message(
+                        [(source.name, source.text) for source in sources],
+                        target_days=values["target_days"],
+                        daily_minutes=values["daily_minutes"],
+                        learner_background=values.get("learner_background", ""),
+                        goal=values.get("goal", ""),
+                        allow_supplement=values["allow_supplement"],
+                    ),
+                    "attachments": [],
+                }],
+                ROADMAP_MAX_OUTPUT_TOKENS,
+                safety_identifier(request.user),
+            )
+            diagnosis, draft = parse_roadmap_output(result.text)
+            if len(draft.get("days") or []) != values["target_days"]:
+                raise RoadmapOutputError("模型返回的学习日数量与目标天数不一致。")
+            draft_serializer = CustomLearningPlanSerializer(data=draft, context={"request": request})
+            if not draft_serializer.is_valid():
+                return Response(
+                    {
+                        "detail": "模型返回的路线不符合本站结构要求。",
+                        "code": "invalid_model_output",
+                        "errors": draft_serializer.errors,
+                    },
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
+            draft = draft_serializer.validated_data
+        except CredentialStorageUnavailable as exc:
+            return Response(
+                {"detail": str(exc), "code": "credential_unavailable"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        except ProviderError as exc:
+            return Response(
+                {"detail": exc.user_message, "code": exc.code},
+                status=exc.status_code,
+            )
+        except RoadmapOutputError as exc:
+            return Response(
+                {"detail": str(exc), "code": "invalid_model_output"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        finally:
+            api_key = ""
+            release_request_lock(request.user.pk)
+
+        usage = None
+        if result.input_tokens or result.output_tokens:
+            usage = {"input_tokens": result.input_tokens, "output_tokens": result.output_tokens}
+        source_metadata = [
+            {"filename": source.name, "characters": len(source.text)}
+            for source in sources
+        ]
+        source_summary = {
+            "filename": sources[0].name if len(sources) == 1 else f"{len(sources)} 个 Markdown 文件",
+            "characters": sum(item["characters"] for item in source_metadata),
+        }
+        return Response({
+            "provider": {
+                "credential": credential.pk,
+                "name": credential.name,
+                "model": credential.model,
+            },
+            # 保留 source 摘要，避免已接入的单文件客户端在升级期间失效。
+            "source": source_summary,
+            "sources": source_metadata,
+            "usage": usage,
+            "diagnosis": diagnosis,
+            "draft": draft,
+        })
 
 
 def progress_for(enrollment, day_number):

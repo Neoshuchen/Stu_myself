@@ -69,6 +69,12 @@ async function open() {
   if (!initialized.value) await loadAssistant()
 }
 
+/** 直接打开账号级模型服务页面，供路线生成等全局入口复用。 */
+async function openConfiguration() {
+  await open()
+  if (initialized.value && catalog.value?.enabled) showConfiguration()
+}
+
 /** 关闭全局抽屉；临时 Key 仅保留到当前登录页面生命周期结束。 */
 function close() {
   if (dialog.value?.open) dialog.value.close()
@@ -207,6 +213,7 @@ async function saveConfiguration() {
       ? credentials.value.map((item) => item.id === saved.id ? saved : item)
       : [saved, ...credentials.value]
     applyCredential(saved)
+    window.dispatchEvent(new CustomEvent('ai-credentials-changed', { detail: saved }))
     configNotice.value = '模型配置已保存并与当前账号绑定。'
   } catch (err) { error.value = err.message } finally { configBusy.value = false }
 }
@@ -219,6 +226,7 @@ async function removeCredential(credential) {
     await api(`/ai/credentials/${credential.id}/`, { method: 'DELETE' })
     credentials.value = credentials.value.filter((item) => item.id !== credential.id)
     if (selectedCredentialId.value === credential.id) resetConfigurationForm()
+    window.dispatchEvent(new CustomEvent('ai-credentials-changed'))
     configNotice.value = '已删除保存的模型配置；已有对话仍会保留。'
   } catch (err) { error.value = err.message } finally { configBusy.value = false }
 }
@@ -438,7 +446,7 @@ async function scrollToLatest() {
   if (messageList.value) messageList.value.scrollTop = messageList.value.scrollHeight
 }
 
-defineExpose({ open })
+defineExpose({ open, openConfiguration })
 </script>
 
 <template>

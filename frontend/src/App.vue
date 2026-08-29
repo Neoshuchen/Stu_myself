@@ -1,10 +1,17 @@
 <script setup>
-import { ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 import { auth } from './auth'
 import AiTutorDrawer from './components/AiTutorDrawer.vue'
 
 const aiTutor = ref(null)
+
+function openAiConfiguration() {
+  aiTutor.value?.openConfiguration()
+}
+
+onMounted(() => window.addEventListener('open-ai-configuration', openAiConfiguration))
+onBeforeUnmount(() => window.removeEventListener('open-ai-configuration', openAiConfiguration))
 </script>
 
 <template>
