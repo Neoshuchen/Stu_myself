@@ -20,7 +20,7 @@ sha256sum --check SHA256SUMS
 cd -- "${project_root}"
 
 # 恢复会覆盖数据库；先生成当前快照，并保留现有媒体目录作为可回退副本。
-"${project_root}/deployment/backup.sh"
+bash "${project_root}/deployment/backup.sh"
 docker compose stop frontend backend
 docker compose up -d --wait db redis
 docker compose exec -T db sh -c \

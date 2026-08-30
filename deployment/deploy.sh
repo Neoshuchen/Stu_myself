@@ -5,7 +5,7 @@ project_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd -- "${project_root}"
 
 if [[ -n "$(docker compose ps --status running -q db 2>/dev/null)" ]]; then
-  "${project_root}/deployment/backup.sh"
+  bash "${project_root}/deployment/backup.sh"
 fi
 
 docker compose build --pull
