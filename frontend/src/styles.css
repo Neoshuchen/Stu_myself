@@ -489,6 +489,7 @@ pre, code { font-family: var(--font-mono); }
 
 @media (min-width: 821px) {
   /* 桌面端左右栏承担不同任务，分别滚动可避免长正文阻塞右侧验收操作。 */
+  body:has(.learn-page) { overflow: hidden; }
   .page-shell:has(> .learn-page) { height: 100dvh; padding-bottom: 44px; overflow: hidden; }
   .learn-page { min-height: 0; height: 100%; display: flex; flex-direction: column; }
   .lesson-heading { width: 100%; flex: none; }
