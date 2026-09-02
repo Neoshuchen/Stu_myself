@@ -5,7 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api'
 import AppShell from '../components/AppShell.vue'
 import LoadingState from '../components/LoadingState.vue'
-import { resizeUploadImage } from '../image'
+import { pastedImages, resizeUploadImage } from '../image'
 
 const route = useRoute()
 const router = useRouter()
@@ -137,22 +137,41 @@ async function completeDay() {
   } catch (err) { error.value = err.message } finally { busy.value = false }
 }
 
-/** 读取用户选择的附件；只有图片会进行客户端缩放。 */
-async function fileChanged(event) {
-  const input = event.target
-  const file = input.files[0] || null
+/** 准备一个证据附件；选择文件和粘贴图片共用同一缩放与错误处理。 */
+async function prepareEvidenceAttachment(file) {
   evidenceError.value = ''
   evidenceForm.value.attachment = null
-  if (!file) return
   preparingEvidence.value = true
   try {
     evidenceForm.value.attachment = await resizeUploadImage(file)
+    return true
   } catch (err) {
-    input.value = ''
     evidenceError.value = err.message || '无法读取图片，请更换文件后重试。'
+    return false
   } finally {
     preparingEvidence.value = false
   }
+}
+
+/** 读取文件选择器中的附件，并允许再次选择同名文件。 */
+async function fileChanged(event) {
+  const file = event.target.files[0] || null
+  if (file) await prepareEvidenceAttachment(file)
+  event.target.value = ''
+}
+
+/** 把说明框内粘贴的第一张图片作为证据附件，普通文字仍按原方式粘贴。 */
+async function evidenceImagePasted(event) {
+  const image = pastedImages(event)[0]
+  if (!image) return
+  event.preventDefault()
+  await prepareEvidenceAttachment(image)
+}
+
+/** 移除尚未提交的证据附件。 */
+function clearEvidenceAttachment() {
+  evidenceForm.value.attachment = null
+  evidenceError.value = ''
 }
 
 async function openKnowledge(item, index) {
@@ -290,8 +309,9 @@ async function requestPeerReview() {
             </div>
             <form class="mini-form" @submit.prevent="addEvidence">
               <div class="form-pair"><select v-model="evidenceForm.kind"><option value="test">测试结果</option><option value="commit">Git提交</option><option value="code">代码</option><option value="log">日志</option><option value="report">报告</option><option value="link">链接</option><option value="note">笔记</option></select><input v-model.trim="evidenceForm.title" required placeholder="证据标题" /></div>
-              <textarea v-model.trim="evidenceForm.content" rows="3" placeholder="粘贴关键输出或说明"></textarea><input v-model.trim="evidenceForm.url" type="url" placeholder="https:// 可选链接" />
+              <textarea v-model.trim="evidenceForm.content" rows="3" placeholder="粘贴关键输出或说明；可直接 Ctrl+V 粘贴图片" @paste="evidenceImagePasted"></textarea><input v-model.trim="evidenceForm.url" type="url" placeholder="https:// 可选链接" />
               <label class="file-input"><input ref="evidenceFileInput" type="file" accept="image/png,image/jpeg,image/webp,text/plain,application/json,application/pdf" @change="fileChanged" /><span>{{ preparingEvidence ? '正在处理图片…' : evidenceForm.attachment?.name || '添加附件（图片自动压缩至8MB内，其他附件最大10MB）' }}</span></label>
+              <button v-if="evidenceForm.attachment" type="button" class="text-action" :disabled="preparingEvidence" :aria-label="`移除附件 ${evidenceForm.attachment.name}`" @click="clearEvidenceAttachment">移除已选附件</button>
               <p v-if="evidenceError" class="form-error" role="alert">{{ evidenceError }}</p>
               <button class="button secondary wide" :disabled="busy || preparingEvidence">提交证据</button>
             </form>

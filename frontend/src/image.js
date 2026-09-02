@@ -1,7 +1,25 @@
 const DEFAULT_MAX_BYTES = 8 * 1024 * 1024
 const MAX_IMAGE_EDGE = 2400
+const PASTABLE_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp'])
 
-/** 使用浏览器原生 Canvas 缩放上传图片，并在提交前执行最终体积限制。 */
+/**
+ * 从粘贴事件中读取可上传图片，不把普通文字或不支持的文件当成图片。
+ * @param {ClipboardEvent} event 浏览器粘贴事件。
+ * @returns {File[]} 剪贴板中的 PNG、JPEG 或 WebP 文件。
+ */
+export function pastedImages(event) {
+  return [...(event.clipboardData?.items || [])]
+    .filter((item) => item.kind === 'file' && PASTABLE_IMAGE_TYPES.has(item.type))
+    .map((item) => item.getAsFile())
+    .filter(Boolean)
+}
+
+/**
+ * 使用浏览器原生 Canvas 缩放上传图片，并在提交前执行最终体积限制。
+ * @param {File} file 待处理的文件；非图片原样返回。
+ * @param {number} maxBytes 图片允许的最大字节数。
+ * @returns {Promise<File>} 可直接提交的原文件或缩放后图片。
+ */
 export async function resizeUploadImage(file, maxBytes = DEFAULT_MAX_BYTES) {
   if (!file?.type.startsWith('image/')) return file
   const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })

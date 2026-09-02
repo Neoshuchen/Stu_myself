@@ -2,7 +2,7 @@
 import { computed, nextTick, ref } from 'vue'
 
 import { api } from '../api'
-import { resizeUploadImage } from '../image'
+import { pastedImages, resizeUploadImage } from '../image'
 
 const ADAPTER_OPTIONS = [
   { id: 'openai_chat_completions', provider: 'openai', name: 'OpenAI 兼容 / Chat Completions', defaultUrl: 'https://api.openai.com/v1' },
@@ -371,14 +371,10 @@ async function filesChanged(event) {
 
 /** 将剪贴板中的 PNG、JPEG 或 WebP 图片作为附件追加，不影响普通文字粘贴。 */
 async function imagesPasted(event) {
-  const supportedTypes = new Set(['image/png', 'image/jpeg', 'image/webp'])
-  const pastedImages = [...(event.clipboardData?.items || [])]
-    .filter((item) => item.kind === 'file' && supportedTypes.has(item.type))
-    .map((item) => item.getAsFile())
-    .filter(Boolean)
-  if (!pastedImages.length) return
+  const images = pastedImages(event)
+  if (!images.length) return
   event.preventDefault()
-  await prepareSelectedFiles(pastedImages)
+  await prepareSelectedFiles(images)
 }
 
 /** 移除一个尚未发送的附件；发送中的 FormData 不允许再被界面修改。 */
