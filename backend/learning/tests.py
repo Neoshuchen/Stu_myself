@@ -97,7 +97,7 @@ class LessonContentTests(TestCase):
 
 class CuratedRoadmapTests(TestCase):
     def test_eleven_roadmaps_each_have_sixty_concrete_days(self):
-        curated = [plan for plan in SYSTEM_ROADMAPS if plan["slug"] != "web-reverse-android-accelerated"]
+        curated = [plan for plan in SYSTEM_ROADMAPS if plan["total_days"] == 60]
         self.assertEqual(len(curated), 11)
         self.assertEqual(len({plan["slug"] for plan in curated}), 11)
         for plan in curated:
@@ -132,8 +132,8 @@ class CuratedRoadmapTests(TestCase):
     def test_import_is_idempotent_and_builds_visible_details(self):
         call_command("import_curated_roadmaps", verbosity=0)
         call_command("import_curated_roadmaps", verbosity=0)
-        self.assertEqual(LearningPlan.objects.filter(creator__isnull=True).count(), 12)
-        self.assertEqual(PlanDay.objects.filter(plan__creator__isnull=True).count(), 842)
+        self.assertEqual(LearningPlan.objects.filter(creator__isnull=True).count(), 13)
+        self.assertEqual(PlanDay.objects.filter(plan__creator__isnull=True).count(), 849)
         plan = LearningPlan.objects.get(slug="python-foundation-60d")
         self.assertEqual(plan.days.count(), 60)
         self.assertTrue(plan.is_published)
@@ -158,9 +158,9 @@ class CuratedRoadmapTests(TestCase):
             self.assertEqual(plan.days.get(day_number=1).content["track"], slug)
             self.assertEqual(plan.days.get(day_number=8).knowledge_details()[0]["run_command"], command)
 
-    def test_versioned_catalog_contains_twelve_routes_and_python_312_content(self):
-        self.assertEqual(len(SYSTEM_ROADMAPS), 12)
-        self.assertEqual(sum(len(plan["days"]) for plan in SYSTEM_ROADMAPS), 842)
+    def test_versioned_catalog_contains_thirteen_routes_and_python_312_content(self):
+        self.assertEqual(len(SYSTEM_ROADMAPS), 13)
+        self.assertEqual(sum(len(plan["days"]) for plan in SYSTEM_ROADMAPS), 849)
         serialized = json.dumps(SYSTEM_ROADMAPS, ensure_ascii=False)
         self.assertNotIn("yuque.com", serialized.casefold())
         self.assertIn("Python 3.12", serialized)
@@ -170,6 +170,18 @@ class CuratedRoadmapTests(TestCase):
         self.assertEqual(tracks[4], "javascript")
         self.assertEqual(tracks[12], "python")
         self.assertEqual(tracks[57], "android")
+
+    def test_git_route_covers_seven_days_with_official_sources_and_recovery(self):
+        plan = next(plan for plan in SYSTEM_ROADMAPS if plan["slug"] == "git-mastery-7d")
+        self.assertEqual(plan["total_days"], 7)
+        self.assertEqual([day["day_number"] for day in plan["days"]], list(range(1, 8)))
+        serialized = json.dumps(plan, ensure_ascii=False)
+        for command in ("git add -p", "git merge --abort", "git fetch", "git reflog", "git rebase -i", "git bisect", "git worktree"):
+            self.assertIn(command, serialized)
+        for day in plan["days"]:
+            resources = day["content"]["knowledge_details"][0]["resources"]
+            self.assertGreaterEqual(len(resources), 3)
+            self.assertTrue(all(item["url"].startswith(("https://git-scm.com/", "https://docs.github.com/")) for item in resources))
 
     def test_new_routes_keep_audited_knowledge_and_sources(self):
         new_slugs = {

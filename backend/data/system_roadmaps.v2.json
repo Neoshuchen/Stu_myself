@@ -124697,6 +124697,1116 @@
           }
         }
       ]
+    },
+    {
+      "slug": "git-mastery-7d",
+      "title": "Git 全流程 7 日实战",
+      "subtitle": "从可靠提交到协作、恢复、历史整理与回归定位",
+      "summary": "以七个高强度练习日掌握开发工作中完整的 Git 主流程：配置与提交、历史查询、分支冲突、远程协作、撤销恢复、rebase 与 cherry-pick、bisect 与 worktree。所有危险操作在一次性仓库演练，并用状态、提交图、失败样例和恢复记录验收。",
+      "audience": "希望在一周内系统掌握命令行 Git，能够独立处理日常开发、团队协作、冲突、误操作恢复和回归定位的学习者",
+      "total_days": 7,
+      "estimated_weeks": 1,
+      "accent_start": "#f97316",
+      "accent_end": "#dc2626",
+      "days": [
+        {
+          "day_number": 1,
+          "phase": "第一阶段：状态模型与提交",
+          "week_number": 1,
+          "week_title": "Git 7 日密集掌握",
+          "title": "建立 Git 心智模型并完成可靠提交",
+          "core_knowledge": "工作区、暂存区、HEAD、对象库、配置、初始化、忽略与原子提交",
+          "hands_on_task": "在一次性目录初始化仓库，配置仓库级身份，建立 .gitignore，分别制造未跟踪、已修改和已暂存状态，完成两个可解释的原子提交",
+          "acceptance_criteria": [
+            "提交仓库结构图、git config --list --show-origin、三种状态截图或文本以及两个语义清晰的提交",
+            "失败样例：让一个文件因忽略规则未被跟踪，使用 git check-ignore -v 定位规则并说明已跟踪文件为何不受 .gitignore 影响"
+          ],
+          "estimated_minutes": 180,
+          "track": "git-mastery-7d",
+          "content": {
+            "version": 5,
+            "knowledge_details": [
+              {
+                "name": "三棵树与一次可靠提交",
+                "summary": "Git 日常操作围绕工作区、索引（暂存区）和 HEAD 指向的提交展开；add 把内容快照写入索引，commit 再把索引保存为提交。先用 status 和 diff 判断状态，再执行改变状态的命令。",
+                "basic": "Git 日常操作围绕工作区、索引（暂存区）和 HEAD 指向的提交展开；add 把内容快照写入索引，commit 再把索引保存为提交。先用 status 和 diff 判断状态，再执行改变状态的命令。 今天所有有风险的命令只在一次性练习仓库执行，并在改变状态前先保存 git status、git log 与必要备份引用。",
+                "mechanism": "文件修改先存在工作区；git add 将指定内容写入索引；git commit 根据索引创建树与提交对象并移动当前分支引用。配置存在 system、global、local 等层级，git config --show-origin 可解释最终值来源。",
+                "tools": [
+                  "git --version / git help",
+                  "git config --show-origin",
+                  "git init / status / add / commit",
+                  "git check-ignore -v"
+                ],
+                "pitfalls": [
+                  "把 git add 理解为只跟踪新文件，忽略它也会更新暂存快照",
+                  "未检查 git diff --cached 就提交混入无关改动",
+                  "把密钥、构建产物或个人配置提交后才补 .gitignore"
+                ],
+                "implementation_requirement": "独立完成“在一次性目录初始化仓库，配置仓库级身份，建立 .gitignore，分别制造未跟踪、已修改和已暂存状态，完成两个可解释的原子提交”；每个关键步骤记录命令、执行前状态、执行后状态和恢复方式，禁止在真实工作仓库练习破坏性操作。",
+                "reference_code": "git --version\ngit init git-seven-days\ncd git-seven-days\ngit config user.name \"Git Learner\"\ngit config user.email \"learner@example.invalid\"\ngit config --list --show-origin\n# 创建 README.md、notes.txt 和 build/output.log，并在 .gitignore 写入 build/\ngit status --short --branch\ngit check-ignore -v build/output.log\ngit add .gitignore README.md\ngit diff --cached\ngit commit -m \"docs: initialize learning repository\"\ngit add notes.txt\ngit commit -m \"docs: add learning notes\"",
+                "language": "text",
+                "run_command": "git status --short --branch",
+                "expected_results": [
+                  "git status 能区分 ??、M 与暂存状态",
+                  "git diff 与 git diff --cached 展示不同边界",
+                  "git log --oneline 至少包含两个职责单一的提交",
+                  "git check-ignore -v 能指出命中的规则来源"
+                ],
+                "mastery": [
+                  "闭卷画出工作区、索引、HEAD 和对象库之间的数据流",
+                  "能预测 add、commit、restore --staged 分别改变哪一层",
+                  "能选择 local/global 配置并追踪配置来源",
+                  "能设计项目级、仓库私有和全局三类忽略规则"
+                ],
+                "resources": [
+                  {
+                    "title": "Git 官方教程",
+                    "url": "https://git-scm.com/docs/gittutorial"
+                  },
+                  {
+                    "title": "Pro Git：首次配置",
+                    "url": "https://git-scm.com/book/en/v2/Getting-Started-First-Time-Git-Setup"
+                  },
+                  {
+                    "title": "Pro Git：记录变更",
+                    "url": "https://git-scm.com/book/en/v2/Git-Basics-Recording-Changes-to-the-Repository"
+                  },
+                  {
+                    "title": "gitignore 官方手册",
+                    "url": "https://git-scm.com/docs/gitignore"
+                  }
+                ],
+                "practice_steps": [
+                  "安装并核对 Git 版本，使用 git help status 打开本地帮助",
+                  "在一次性目录完成仓库级身份和默认分支配置",
+                  "制造未跟踪、已修改、已暂存三种状态并逐次保存 status/diff",
+                  "建立忽略规则、定位一次失败样例，再完成两个原子提交"
+                ],
+                "code_explanation": [
+                  "命令序列先读取状态和历史，再执行单一变更，最后用 status、diff、log 或测试核对结果。",
+                  "失败路径必须保留原始输出并使用 abort、reflog、备份分支或正常整合恢复，不能用删除仓库掩盖问题。"
+                ],
+                "what_it_solves": "Git 日常操作围绕工作区、索引（暂存区）和 HEAD 指向的提交展开；add 把内容快照写入索引，commit 再把索引保存为提交。先用 status 和 diff 判断状态，再执行改变状态的命令。",
+                "role": "在第 1 日综合任务中直接服务于：在一次性目录初始化仓库，配置仓库级身份，建立 .gitignore，分别制造未跟踪、已修改和已暂存状态，完成两个可解释的原子提交"
+              }
+            ],
+            "prerequisites": [
+              "已安装命令行 Git，并能在终端运行 git --version 与 git help",
+              "仅使用当天新建的无敏感信息练习仓库；涉及 hard、clean、rebase 或强制推送时先建立可核对的备份引用"
+            ],
+            "learning_objectives": [
+              "能用自己的话解释“三棵树与一次可靠提交”涉及的状态和适用边界",
+              "能不看答案独立完成：在一次性目录初始化仓库，配置仓库级身份，建立 .gitignore，分别制造未跟踪、已修改和已暂存状态，完成两个可解释的原子提交",
+              "能根据 status、diff、日志、测试和失败输出证明结果，并选择可恢复的处理方式"
+            ],
+            "concept_map": [
+              {
+                "term": "索引",
+                "explanation": "索引保存下一次提交的精确快照，不是简单的待办文件列表。"
+              },
+              {
+                "term": "HEAD",
+                "explanation": "HEAD 通常符号指向当前分支，当前分支再指向最新提交。"
+              },
+              {
+                "term": ".gitignore",
+                "explanation": "忽略规则只影响尚未跟踪的路径；已跟踪文件需另行停止跟踪。"
+              }
+            ],
+            "comprehensive_task": {
+              "goal": "在一次性目录初始化仓库，配置仓库级身份，建立 .gitignore，分别制造未跟踪、已修改和已暂存状态，完成两个可解释的原子提交",
+              "input": "使用当天创建的一次性本地仓库、本地 bare 远程或虚构内容，不包含真实项目密钥、个人数据和未备份工作。",
+              "output": "提交命令清单、关键状态前后对照、提交图或 diff、验证结果、失败样例和恢复记录。",
+              "requirements": [
+                "先预测命令将改变工作区、索引、HEAD、本地引用还是远程引用，再执行",
+                "每个阶段都用 git status --short --branch 和相关只读命令核对",
+                "至少完成一个正常流程、一个失败或冲突流程和一个恢复流程"
+              ],
+              "error_cases": [
+                "命令结果与预测不一致时立即停止，保存状态和错误输出，不继续叠加破坏性操作",
+                "真实协作分支或已有工作目录不作为破坏性练习对象；不确定时新建仓库、分支或 worktree"
+              ]
+            },
+            "verification": {
+              "checks": [
+                "提交仓库结构图、git config --list --show-origin、三种状态截图或文本以及两个语义清晰的提交",
+                "失败样例：让一个文件因忽略规则未被跟踪，使用 git check-ignore -v 定位规则并说明已跟踪文件为何不受 .gitignore 影响",
+                "正常路径与边界路径均已在一次性仓库复现",
+                "能闭卷解释命令改变的引用、索引或工作区状态"
+              ],
+              "evidence": [
+                "可复制的命令与关键输出记录",
+                "提交图、状态或 diff 的前后对照",
+                "失败、冲突或拒绝样例及恢复过程",
+                "不少于 150 字的当天复盘和一张新增命令决策卡"
+              ]
+            },
+            "workflow": [
+              {
+                "title": "先画状态",
+                "body": "写下当前分支、HEAD、工作区、索引和相关远程引用，预测下一条命令会改变哪一层。"
+              },
+              {
+                "title": "小步执行",
+                "body": "每次只执行一个改变状态的动作，紧接着用 status、diff、log 或测试核验。"
+              },
+              {
+                "title": "制造失败",
+                "body": "在一次性仓库主动制造一个冲突、拒绝或错误操作，保存原始输出和中间状态。"
+              },
+              {
+                "title": "恢复并闭卷",
+                "body": "用对应 abort、reflog、备份引用或正常整合恢复；关闭资料后重新完成核心流程。"
+              }
+            ],
+            "track": "git-mastery-7d"
+          }
+        },
+        {
+          "day_number": 2,
+          "phase": "第一阶段：状态模型与提交",
+          "week_number": 1,
+          "week_title": "Git 7 日密集掌握",
+          "title": "精确比较、查询历史与定位版本",
+          "core_knowledge": "diff 边界、部分暂存、log/show、提交引用、范围、pathspec、文件历史与 amend",
+          "hands_on_task": "制造混合改动并用 git add -p 拆成两个提交；随后用 log、show、diff、grep 和提交范围回答谁改了什么、两个版本差什么",
+          "acceptance_criteria": [
+            "提交一份命令记录，至少覆盖 git diff、git diff --cached、git add -p、git log --graph、git show 和 HEAD~n",
+            "失败样例：故意使用错误的提交范围或 pathspec 得到空结果，再用 git rev-parse、git log --all -- 路径定位原因"
+          ],
+          "estimated_minutes": 180,
+          "track": "git-mastery-7d",
+          "content": {
+            "version": 5,
+            "knowledge_details": [
+              {
+                "name": "可审查历史与修订选择",
+                "summary": "比较命令必须明确两端：工作区、索引或某个提交；修订表达式用名称、相对位置和集合描述提交。能先说清两端和路径范围，才能信任 diff 与 log 的答案。",
+                "basic": "比较命令必须明确两端：工作区、索引或某个提交；修订表达式用名称、相对位置和集合描述提交。能先说清两端和路径范围，才能信任 diff 与 log 的答案。 今天所有有风险的命令只在一次性练习仓库执行，并在改变状态前先保存 git status、git log 与必要备份引用。",
+                "mechanism": "git diff 默认比较工作区与索引，--cached 比较索引与 HEAD；git show 展开对象，log 遍历可达提交。HEAD^、HEAD~2、A..B、A...B 和 -- path 各自表达父提交、祖先、集合差、对称差和路径限定。",
+                "tools": [
+                  "git diff / add -p",
+                  "git log / show / shortlog",
+                  "git rev-parse / gitrevisions",
+                  "git grep / pathspec"
+                ],
+                "pitfalls": [
+                  "混淆 git diff 与 git diff --cached 导致审查对象错误",
+                  "把 A..B 当作文件差异而不是提交集合",
+                  "对已共享提交随意 amend，制造历史分叉"
+                ],
+                "implementation_requirement": "独立完成“制造混合改动并用 git add -p 拆成两个提交；随后用 log、show、diff、grep 和提交范围回答谁改了什么、两个版本差什么”；每个关键步骤记录命令、执行前状态、执行后状态和恢复方式，禁止在真实工作仓库练习破坏性操作。",
+                "reference_code": "# 在 README.md 同时加入两个互不相关的改动\ngit diff\ngit add -p README.md\ngit diff --cached\ngit commit -m \"docs: clarify repository model\"\ngit add README.md\ngit commit -m \"docs: add command index\"\ngit log --oneline --graph --decorate --all\ngit show --stat HEAD\ngit diff HEAD~2..HEAD -- README.md\ngit log --follow -- README.md\ngit rev-parse --verify HEAD~1\ngit grep -n \"Git\" HEAD",
+                "language": "text",
+                "run_command": "git log --oneline --graph --decorate --all",
+                "expected_results": [
+                  "一次混合改动被 add -p 分成两个独立提交",
+                  "能解释默认 diff 与 --cached 的两端",
+                  "能用 HEAD~n、分支名和哈希定位同一提交",
+                  "能用 -- 限定路径并解释两点/三点范围差异"
+                ],
+                "mastery": [
+                  "给出任意仓库状态时选择正确的 diff 命令",
+                  "能阅读 --graph --decorate 输出并识别分支指针",
+                  "能用 show、log -p、log --follow 追踪变更",
+                  "只对未共享的最后提交正确使用 commit --amend"
+                ],
+                "resources": [
+                  {
+                    "title": "git diff 官方手册",
+                    "url": "https://git-scm.com/docs/git-diff"
+                  },
+                  {
+                    "title": "git log 官方手册",
+                    "url": "https://git-scm.com/docs/git-log"
+                  },
+                  {
+                    "title": "gitrevisions 官方手册",
+                    "url": "https://git-scm.com/docs/gitrevisions"
+                  },
+                  {
+                    "title": "Pro Git：记录变更",
+                    "url": "https://git-scm.com/book/en/v2/Git-Basics-Recording-Changes-to-the-Repository"
+                  }
+                ],
+                "practice_steps": [
+                  "先画出三个比较端点，再运行默认 diff 与 --cached 对照",
+                  "使用 add -p 拆分混合改动并逐个提交",
+                  "用 log、show、grep 和 pathspec 回答五个历史问题",
+                  "制造空查询失败样例，核对修订与路径后写出原因"
+                ],
+                "code_explanation": [
+                  "命令序列先读取状态和历史，再执行单一变更，最后用 status、diff、log 或测试核对结果。",
+                  "失败路径必须保留原始输出并使用 abort、reflog、备份分支或正常整合恢复，不能用删除仓库掩盖问题。"
+                ],
+                "what_it_solves": "比较命令必须明确两端：工作区、索引或某个提交；修订表达式用名称、相对位置和集合描述提交。能先说清两端和路径范围，才能信任 diff 与 log 的答案。",
+                "role": "在第 2 日综合任务中直接服务于：制造混合改动并用 git add -p 拆成两个提交；随后用 log、show、diff、grep 和提交范围回答谁改了什么、两个版本差什么"
+              }
+            ],
+            "prerequisites": [
+              "已安装命令行 Git，并能在终端运行 git --version 与 git help",
+              "仅使用当天新建的无敏感信息练习仓库；涉及 hard、clean、rebase 或强制推送时先建立可核对的备份引用"
+            ],
+            "learning_objectives": [
+              "能用自己的话解释“可审查历史与修订选择”涉及的状态和适用边界",
+              "能不看答案独立完成：制造混合改动并用 git add -p 拆成两个提交；随后用 log、show、diff、grep 和提交范围回答谁改了什么、两个版本差什么",
+              "能根据 status、diff、日志、测试和失败输出证明结果，并选择可恢复的处理方式"
+            ],
+            "concept_map": [
+              {
+                "term": "修订",
+                "explanation": "分支、标签、哈希和 HEAD 相对表达式最终都解析为对象名称。"
+              },
+              {
+                "term": "范围",
+                "explanation": "A..B 选择 B 可达而 A 不可达的提交；A...B 选择两端非共同可达的提交。"
+              },
+              {
+                "term": "pathspec",
+                "explanation": "双横线后的 pathspec 将提交参数与路径限定明确分隔。"
+              }
+            ],
+            "comprehensive_task": {
+              "goal": "制造混合改动并用 git add -p 拆成两个提交；随后用 log、show、diff、grep 和提交范围回答谁改了什么、两个版本差什么",
+              "input": "使用当天创建的一次性本地仓库、本地 bare 远程或虚构内容，不包含真实项目密钥、个人数据和未备份工作。",
+              "output": "提交命令清单、关键状态前后对照、提交图或 diff、验证结果、失败样例和恢复记录。",
+              "requirements": [
+                "先预测命令将改变工作区、索引、HEAD、本地引用还是远程引用，再执行",
+                "每个阶段都用 git status --short --branch 和相关只读命令核对",
+                "至少完成一个正常流程、一个失败或冲突流程和一个恢复流程"
+              ],
+              "error_cases": [
+                "命令结果与预测不一致时立即停止，保存状态和错误输出，不继续叠加破坏性操作",
+                "真实协作分支或已有工作目录不作为破坏性练习对象；不确定时新建仓库、分支或 worktree"
+              ]
+            },
+            "verification": {
+              "checks": [
+                "提交一份命令记录，至少覆盖 git diff、git diff --cached、git add -p、git log --graph、git show 和 HEAD~n",
+                "失败样例：故意使用错误的提交范围或 pathspec 得到空结果，再用 git rev-parse、git log --all -- 路径定位原因",
+                "正常路径与边界路径均已在一次性仓库复现",
+                "能闭卷解释命令改变的引用、索引或工作区状态"
+              ],
+              "evidence": [
+                "可复制的命令与关键输出记录",
+                "提交图、状态或 diff 的前后对照",
+                "失败、冲突或拒绝样例及恢复过程",
+                "不少于 150 字的当天复盘和一张新增命令决策卡"
+              ]
+            },
+            "workflow": [
+              {
+                "title": "先画状态",
+                "body": "写下当前分支、HEAD、工作区、索引和相关远程引用，预测下一条命令会改变哪一层。"
+              },
+              {
+                "title": "小步执行",
+                "body": "每次只执行一个改变状态的动作，紧接着用 status、diff、log 或测试核验。"
+              },
+              {
+                "title": "制造失败",
+                "body": "在一次性仓库主动制造一个冲突、拒绝或错误操作，保存原始输出和中间状态。"
+              },
+              {
+                "title": "恢复并闭卷",
+                "body": "用对应 abort、reflog、备份引用或正常整合恢复；关闭资料后重新完成核心流程。"
+              }
+            ],
+            "track": "git-mastery-7d"
+          }
+        },
+        {
+          "day_number": 3,
+          "phase": "第二阶段：分支协作与远程",
+          "week_number": 1,
+          "week_title": "Git 7 日密集掌握",
+          "title": "掌握分支、合并与冲突恢复",
+          "core_knowledge": "branch/switch、快进与三方合并、merge-base、冲突标记、ours/theirs、continue/abort",
+          "hands_on_task": "从共同基线创建两个分支，分别完成一次快进合并和一次真实冲突；检查三个阶段条目，正确解决并验证合并，也演练 merge --abort",
+          "acceptance_criteria": [
+            "提交分支图、一次快进结果、一次带合并提交的冲突解决结果，以及冲突前后测试或文本核对",
+            "失败样例：保留冲突状态下的 git status、git diff --cc 与 git ls-files -u，先执行 git merge --abort 恢复，再重新合并解决"
+          ],
+          "estimated_minutes": 210,
+          "track": "git-mastery-7d",
+          "content": {
+            "version": 5,
+            "knowledge_details": [
+              {
+                "name": "分支指针、合并与冲突",
+                "summary": "分支是可移动提交引用，切换分支会同时改变 HEAD、索引和工作区。合并先找共同祖先：可直接前移时快进，否则执行三方合并；冲突表示 Git 无法替人决定最终内容。",
+                "basic": "分支是可移动提交引用，切换分支会同时改变 HEAD、索引和工作区。合并先找共同祖先：可直接前移时快进，否则执行三方合并；冲突表示 Git 无法替人决定最终内容。 今天所有有风险的命令只在一次性练习仓库执行，并在改变状态前先保存 git status、git log 与必要备份引用。",
+                "mechanism": "git switch -c 创建并切换分支；git merge 以当前分支为接收方。冲突时索引保存 base、ours、theirs 三个阶段，编辑最终文件并 git add 标记解决；--abort 尝试回到合并前状态。",
+                "tools": [
+                  "git branch -vv / switch",
+                  "git merge / merge-base",
+                  "git status / diff --cc",
+                  "git ls-files -u / merge --abort"
+                ],
+                "pitfalls": [
+                  "站在错误分支执行 merge，接收方与预期相反",
+                  "看到冲突标记就只删符号，未验证最终语义",
+                  "把 rebase 中的 ours/theirs 方向套用到普通 merge"
+                ],
+                "implementation_requirement": "独立完成“从共同基线创建两个分支，分别完成一次快进合并和一次真实冲突；检查三个阶段条目，正确解决并验证合并，也演练 merge --abort”；每个关键步骤记录命令、执行前状态、执行后状态和恢复方式，禁止在真实工作仓库练习破坏性操作。",
+                "reference_code": "git switch -c feature/fast-forward\n# 修改 notes.txt 后提交\ngit commit -am \"docs: add fast-forward note\"\ngit switch main\ngit merge --ff-only feature/fast-forward\ngit switch -c feature/conflict-a\n# 修改 README.md 同一行并提交\ngit switch main\n# 对 README.md 同一行做不同修改并提交\ngit merge feature/conflict-a\ngit status\ngit diff --cc\ngit ls-files -u\ngit merge --abort\n# 再次合并，编辑最终内容，git add README.md 后 git commit\ngit log --oneline --graph --decorate --all",
+                "language": "text",
+                "run_command": "git branch --all --verbose",
+                "expected_results": [
+                  "能从日志区分快进与合并提交",
+                  "冲突时能说明 base/ours/theirs",
+                  "abort 后 HEAD 与工作区回到合并前",
+                  "解决后无冲突标记且验证命令通过"
+                ],
+                "mastery": [
+                  "无需查资料创建、切换、重命名和安全删除分支",
+                  "能在执行前说出 merge 的接收方和来源",
+                  "能按 status 提示完成 continue 或 abort",
+                  "能保留双方意图而不是机械选择一侧"
+                ],
+                "resources": [
+                  {
+                    "title": "Pro Git：分支管理",
+                    "url": "https://git-scm.com/book/en/v2/Git-Branching-Branch-Management"
+                  },
+                  {
+                    "title": "Pro Git：基础分支与合并",
+                    "url": "https://git-scm.com/book/en/v2/Git-Branching-Basic-Branching-and-Merging"
+                  },
+                  {
+                    "title": "git merge 官方手册",
+                    "url": "https://git-scm.com/docs/git-merge"
+                  },
+                  {
+                    "title": "GitHub：命令行解决合并冲突",
+                    "url": "https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/resolving-a-merge-conflict-using-the-command-line"
+                  }
+                ],
+                "practice_steps": [
+                  "用分支图预测一次快进合并并验证",
+                  "制造同一行双向修改形成真实冲突",
+                  "检查索引三阶段与组合 diff 后先 abort",
+                  "重新合并、编辑最终语义、标记解决并验证历史"
+                ],
+                "code_explanation": [
+                  "命令序列先读取状态和历史，再执行单一变更，最后用 status、diff、log 或测试核对结果。",
+                  "失败路径必须保留原始输出并使用 abort、reflog、备份分支或正常整合恢复，不能用删除仓库掩盖问题。"
+                ],
+                "what_it_solves": "分支是可移动提交引用，切换分支会同时改变 HEAD、索引和工作区。合并先找共同祖先：可直接前移时快进，否则执行三方合并；冲突表示 Git 无法替人决定最终内容。",
+                "role": "在第 3 日综合任务中直接服务于：从共同基线创建两个分支，分别完成一次快进合并和一次真实冲突；检查三个阶段条目，正确解决并验证合并，也演练 merge --abort"
+              }
+            ],
+            "prerequisites": [
+              "已安装命令行 Git，并能在终端运行 git --version 与 git help",
+              "仅使用当天新建的无敏感信息练习仓库；涉及 hard、clean、rebase 或强制推送时先建立可核对的备份引用"
+            ],
+            "learning_objectives": [
+              "能用自己的话解释“分支指针、合并与冲突”涉及的状态和适用边界",
+              "能不看答案独立完成：从共同基线创建两个分支，分别完成一次快进合并和一次真实冲突；检查三个阶段条目，正确解决并验证合并，也演练 merge --abort",
+              "能根据 status、diff、日志、测试和失败输出证明结果，并选择可恢复的处理方式"
+            ],
+            "concept_map": [
+              {
+                "term": "分支",
+                "explanation": "分支只是指向提交的可移动引用，创建分支不会复制文件历史。"
+              },
+              {
+                "term": "merge-base",
+                "explanation": "三方合并以双方最近共同祖先作为基线比较变化。"
+              },
+              {
+                "term": "冲突",
+                "explanation": "冲突是自动合并缺少决策信息，不代表仓库损坏。"
+              }
+            ],
+            "comprehensive_task": {
+              "goal": "从共同基线创建两个分支，分别完成一次快进合并和一次真实冲突；检查三个阶段条目，正确解决并验证合并，也演练 merge --abort",
+              "input": "使用当天创建的一次性本地仓库、本地 bare 远程或虚构内容，不包含真实项目密钥、个人数据和未备份工作。",
+              "output": "提交命令清单、关键状态前后对照、提交图或 diff、验证结果、失败样例和恢复记录。",
+              "requirements": [
+                "先预测命令将改变工作区、索引、HEAD、本地引用还是远程引用，再执行",
+                "每个阶段都用 git status --short --branch 和相关只读命令核对",
+                "至少完成一个正常流程、一个失败或冲突流程和一个恢复流程"
+              ],
+              "error_cases": [
+                "命令结果与预测不一致时立即停止，保存状态和错误输出，不继续叠加破坏性操作",
+                "真实协作分支或已有工作目录不作为破坏性练习对象；不确定时新建仓库、分支或 worktree"
+              ]
+            },
+            "verification": {
+              "checks": [
+                "提交分支图、一次快进结果、一次带合并提交的冲突解决结果，以及冲突前后测试或文本核对",
+                "失败样例：保留冲突状态下的 git status、git diff --cc 与 git ls-files -u，先执行 git merge --abort 恢复，再重新合并解决",
+                "正常路径与边界路径均已在一次性仓库复现",
+                "能闭卷解释命令改变的引用、索引或工作区状态"
+              ],
+              "evidence": [
+                "可复制的命令与关键输出记录",
+                "提交图、状态或 diff 的前后对照",
+                "失败、冲突或拒绝样例及恢复过程",
+                "不少于 150 字的当天复盘和一张新增命令决策卡"
+              ]
+            },
+            "workflow": [
+              {
+                "title": "先画状态",
+                "body": "写下当前分支、HEAD、工作区、索引和相关远程引用，预测下一条命令会改变哪一层。"
+              },
+              {
+                "title": "小步执行",
+                "body": "每次只执行一个改变状态的动作，紧接着用 status、diff、log 或测试核验。"
+              },
+              {
+                "title": "制造失败",
+                "body": "在一次性仓库主动制造一个冲突、拒绝或错误操作，保存原始输出和中间状态。"
+              },
+              {
+                "title": "恢复并闭卷",
+                "body": "用对应 abort、reflog、备份引用或正常整合恢复；关闭资料后重新完成核心流程。"
+              }
+            ],
+            "track": "git-mastery-7d"
+          }
+        },
+        {
+          "day_number": 4,
+          "phase": "第二阶段：分支协作与远程",
+          "week_number": 1,
+          "week_title": "Git 7 日密集掌握",
+          "title": "完成远程协作、同步与发布",
+          "core_knowledge": "clone/remote、远程跟踪分支、fetch/pull、push/upstream、非快进拒绝、标签与安全协作",
+          "hands_on_task": "用本地 bare 仓库模拟服务器，再克隆为 Alice/Bob 两个工作副本；完成 fetch 后审查、分支推送、非快进拒绝处理和带注释标签发布",
+          "acceptance_criteria": [
+            "提交 bare 远程、两个克隆的命令记录，能证明 origin/main 是远程跟踪引用而非实时远程状态",
+            "失败样例：制造一次 non-fast-forward push 拒绝，使用 fetch 后审查并 merge 或 rebase，再正常 push；不使用裸 --force"
+          ],
+          "estimated_minutes": 210,
+          "track": "git-mastery-7d",
+          "content": {
+            "version": 5,
+            "knowledge_details": [
+              {
+                "name": "远程引用与分布式协作",
+                "summary": "fetch 只更新远程跟踪引用，不修改当前工作；pull 是 fetch 后再按配置 merge 或 rebase。push 请求远程移动引用，若会丢失远程可达提交通常被拒绝。",
+                "basic": "fetch 只更新远程跟踪引用，不修改当前工作；pull 是 fetch 后再按配置 merge 或 rebase。push 请求远程移动引用，若会丢失远程可达提交通常被拒绝。 今天所有有风险的命令只在一次性练习仓库执行，并在改变状态前先保存 git status、git log 与必要备份引用。",
+                "mechanism": "clone 复制对象并建立 origin；remote-tracking 引用记录上次 fetch 的远端状态。upstream 让无参数 pull/push 知道对应分支。标签默认不会随普通 push 全部发送，应显式推送需要发布的标签。",
+                "tools": [
+                  "git clone --bare / clone",
+                  "git remote -v / remote show",
+                  "git fetch / pull --ff-only",
+                  "git push -u / push --tags",
+                  "git tag -a"
+                ],
+                "pitfalls": [
+                  "把 fetch 当成自动更新当前分支",
+                  "不审查就 pull，把下载与集成问题混在一起",
+                  "用 git push --force 覆盖同伴提交"
+                ],
+                "implementation_requirement": "独立完成“用本地 bare 仓库模拟服务器，再克隆为 Alice/Bob 两个工作副本；完成 fetch 后审查、分支推送、非快进拒绝处理和带注释标签发布”；每个关键步骤记录命令、执行前状态、执行后状态和恢复方式，禁止在真实工作仓库练习破坏性操作。",
+                "reference_code": "cd ..\ngit clone --bare git-seven-days remote.git\ngit clone remote.git alice\ngit clone remote.git bob\n# Alice 创建 feature/remote 分支并 git push -u origin feature/remote\n# Bob 在 main 提交并 push；Alice 在旧 main 上另做提交后 push，观察 non-fast-forward\ngit fetch --prune origin\ngit log --oneline --left-right HEAD...origin/main\ngit merge origin/main\ngit push\ngit tag -a v0.1.0 -m \"first practice release\"\ngit push origin v0.1.0\ngit remote show origin",
+                "language": "text",
+                "run_command": "git remote -v",
+                "expected_results": [
+                  "两个克隆拥有独立工作区和完整历史",
+                  "fetch 后当前分支不变而 origin/main 更新",
+                  "能解释拒绝推送保护了哪个提交",
+                  "远端可见上游分支与带注释标签"
+                ],
+                "mastery": [
+                  "能区分 remote、remote-tracking branch 与本地分支",
+                  "能选择 fetch+审查、pull --ff-only 或 pull --rebase",
+                  "能建立和检查 upstream",
+                  "遇到非快进拒绝时先整合而不是强推"
+                ],
+                "resources": [
+                  {
+                    "title": "Pro Git：使用远程仓库",
+                    "url": "https://git-scm.com/book/en/v2/Git-Basics-Working-with-Remotes"
+                  },
+                  {
+                    "title": "git fetch 官方手册",
+                    "url": "https://git-scm.com/docs/git-fetch"
+                  },
+                  {
+                    "title": "git pull 官方手册",
+                    "url": "https://git-scm.com/docs/git-pull"
+                  },
+                  {
+                    "title": "git push 官方手册",
+                    "url": "https://git-scm.com/docs/git-push"
+                  },
+                  {
+                    "title": "git tag 官方手册",
+                    "url": "https://git-scm.com/docs/git-tag"
+                  }
+                ],
+                "practice_steps": [
+                  "创建本地 bare 远程和两个克隆，避免依赖网络账户",
+                  "推送主题分支并检查 upstream",
+                  "制造远端领先与本地分叉，记录拒绝输出",
+                  "fetch 后比较、整合、推送并创建带注释标签"
+                ],
+                "code_explanation": [
+                  "命令序列先读取状态和历史，再执行单一变更，最后用 status、diff、log 或测试核对结果。",
+                  "失败路径必须保留原始输出并使用 abort、reflog、备份分支或正常整合恢复，不能用删除仓库掩盖问题。"
+                ],
+                "what_it_solves": "fetch 只更新远程跟踪引用，不修改当前工作；pull 是 fetch 后再按配置 merge 或 rebase。push 请求远程移动引用，若会丢失远程可达提交通常被拒绝。",
+                "role": "在第 4 日综合任务中直接服务于：用本地 bare 仓库模拟服务器，再克隆为 Alice/Bob 两个工作副本；完成 fetch 后审查、分支推送、非快进拒绝处理和带注释标签发布"
+              }
+            ],
+            "prerequisites": [
+              "已安装命令行 Git，并能在终端运行 git --version 与 git help",
+              "仅使用当天新建的无敏感信息练习仓库；涉及 hard、clean、rebase 或强制推送时先建立可核对的备份引用"
+            ],
+            "learning_objectives": [
+              "能用自己的话解释“远程引用与分布式协作”涉及的状态和适用边界",
+              "能不看答案独立完成：用本地 bare 仓库模拟服务器，再克隆为 Alice/Bob 两个工作副本；完成 fetch 后审查、分支推送、非快进拒绝处理和带注释标签发布",
+              "能根据 status、diff、日志、测试和失败输出证明结果，并选择可恢复的处理方式"
+            ],
+            "concept_map": [
+              {
+                "term": "远程跟踪分支",
+                "explanation": "origin/main 是本地记录的远端状态，只在网络操作后更新。"
+              },
+              {
+                "term": "fetch",
+                "explanation": "fetch 下载对象并更新远程跟踪引用，不自动改当前分支。"
+              },
+              {
+                "term": "非快进",
+                "explanation": "若新引用不能从旧引用沿父链到达，更新可能让提交失去引用，因此默认拒绝。"
+              }
+            ],
+            "comprehensive_task": {
+              "goal": "用本地 bare 仓库模拟服务器，再克隆为 Alice/Bob 两个工作副本；完成 fetch 后审查、分支推送、非快进拒绝处理和带注释标签发布",
+              "input": "使用当天创建的一次性本地仓库、本地 bare 远程或虚构内容，不包含真实项目密钥、个人数据和未备份工作。",
+              "output": "提交命令清单、关键状态前后对照、提交图或 diff、验证结果、失败样例和恢复记录。",
+              "requirements": [
+                "先预测命令将改变工作区、索引、HEAD、本地引用还是远程引用，再执行",
+                "每个阶段都用 git status --short --branch 和相关只读命令核对",
+                "至少完成一个正常流程、一个失败或冲突流程和一个恢复流程"
+              ],
+              "error_cases": [
+                "命令结果与预测不一致时立即停止，保存状态和错误输出，不继续叠加破坏性操作",
+                "真实协作分支或已有工作目录不作为破坏性练习对象；不确定时新建仓库、分支或 worktree"
+              ]
+            },
+            "verification": {
+              "checks": [
+                "提交 bare 远程、两个克隆的命令记录，能证明 origin/main 是远程跟踪引用而非实时远程状态",
+                "失败样例：制造一次 non-fast-forward push 拒绝，使用 fetch 后审查并 merge 或 rebase，再正常 push；不使用裸 --force",
+                "正常路径与边界路径均已在一次性仓库复现",
+                "能闭卷解释命令改变的引用、索引或工作区状态"
+              ],
+              "evidence": [
+                "可复制的命令与关键输出记录",
+                "提交图、状态或 diff 的前后对照",
+                "失败、冲突或拒绝样例及恢复过程",
+                "不少于 150 字的当天复盘和一张新增命令决策卡"
+              ]
+            },
+            "workflow": [
+              {
+                "title": "先画状态",
+                "body": "写下当前分支、HEAD、工作区、索引和相关远程引用，预测下一条命令会改变哪一层。"
+              },
+              {
+                "title": "小步执行",
+                "body": "每次只执行一个改变状态的动作，紧接着用 status、diff、log 或测试核验。"
+              },
+              {
+                "title": "制造失败",
+                "body": "在一次性仓库主动制造一个冲突、拒绝或错误操作，保存原始输出和中间状态。"
+              },
+              {
+                "title": "恢复并闭卷",
+                "body": "用对应 abort、reflog、备份引用或正常整合恢复；关闭资料后重新完成核心流程。"
+              }
+            ],
+            "track": "git-mastery-7d"
+          }
+        },
+        {
+          "day_number": 5,
+          "phase": "第三阶段：恢复与历史整理",
+          "week_number": 1,
+          "week_title": "Git 7 日密集掌握",
+          "title": "安全撤销、暂存现场并从 reflog 恢复",
+          "core_knowledge": "restore、reset 三种模式、revert、reflog、stash、clean 预演与数据恢复边界",
+          "hands_on_task": "在一次性仓库分别撤销工作区、取消暂存、回退本地提交、反做已共享提交；故意丢失分支指针后用 reflog 恢复，并演练 stash 与 clean -n",
+          "acceptance_criteria": [
+            "提交一张按“是否已提交、是否已共享、是否保留工作区”选择 restore/reset/revert 的决策表及每条路径证据",
+            "失败样例：在一次性仓库执行一次 reset --hard 造成提交不可见，再用 git reflog 找回并建立 rescue 分支；clean 只先运行 -n/-ndx 预演"
+          ],
+          "estimated_minutes": 210,
+          "track": "git-mastery-7d",
+          "content": {
+            "version": 5,
+            "knowledge_details": [
+              {
+                "name": "撤销矩阵与 reflog 救援",
+                "summary": "撤销不是一个命令：restore 面向工作区/索引，reset 移动当前分支并按模式影响索引和工作区，revert 新建反向提交，reflog 记录本地引用移动。选择取决于改动所在层级和是否已经共享。",
+                "basic": "撤销不是一个命令：restore 面向工作区/索引，reset 移动当前分支并按模式影响索引和工作区，revert 新建反向提交，reflog 记录本地引用移动。选择取决于改动所在层级和是否已经共享。 今天所有有风险的命令只在一次性练习仓库执行，并在改变状态前先保存 git status、git log 与必要备份引用。",
+                "mechanism": "restore 默认从索引恢复工作区，--staged 通常从 HEAD 恢复索引；reset --soft/--mixed/--hard 逐步影响分支、索引、工作区；revert 保留历史并追加提交。reflog 可定位本地引用曾指向的提交，但有保留期限且不是备份。",
+                "tools": [
+                  "git restore / restore --staged",
+                  "git reset --soft/--mixed/--hard",
+                  "git revert",
+                  "git reflog / branch rescue",
+                  "git stash / clean -n"
+                ],
+                "pitfalls": [
+                  "在有未保存工作时运行 reset --hard",
+                  "对共享分支 reset 后强推改写同伴历史",
+                  "把 reflog 当永久备份或跨克隆同步记录",
+                  "未预演就 clean -fdx 删除未跟踪文件"
+                ],
+                "implementation_requirement": "独立完成“在一次性仓库分别撤销工作区、取消暂存、回退本地提交、反做已共享提交；故意丢失分支指针后用 reflog 恢复，并演练 stash 与 clean -n”；每个关键步骤记录命令、执行前状态、执行后状态和恢复方式，禁止在真实工作仓库练习破坏性操作。",
+                "reference_code": "# 在一次性仓库制造工作区、暂存区和已提交三层改动\ngit restore --worktree notes.txt\ngit restore --staged README.md\ngit reset --soft HEAD~1\ngit reset --mixed HEAD\n# 创建一个错误提交后使用 git revert <hash>\ngit stash push -u -m \"day5 work in progress\"\ngit stash list\ngit stash show -p stash@{0}\ngit stash pop\ngit clean -ndx\n# 记录当前提交，执行 git reset --hard HEAD~1，再从 reflog 找到旧提交\ngit reflog --date=iso\ngit branch rescue/recovered <reflog中的提交>\ngit fsck --no-reflogs --unreachable",
+                "language": "text",
+                "run_command": "git reflog --date=iso",
+                "expected_results": [
+                  "决策表明确每个命令改变的层级",
+                  "revert 后历史中保留原提交和反向提交",
+                  "stash 能恢复已跟踪与 -u 包含的未跟踪改动",
+                  "reflog 恢复分支指向并证明内容未丢失"
+                ],
+                "mastery": [
+                  "看状态即可选择 restore、reset 或 revert",
+                  "能解释 soft/mixed/hard 的引用、索引、工作区影响",
+                  "能安全查看、应用、弹出和分支化 stash",
+                  "能用 reflog 创建救援引用并说明其局限"
+                ],
+                "resources": [
+                  {
+                    "title": "Pro Git：撤销操作",
+                    "url": "https://git-scm.com/book/en/v2/Git-Basics-Undoing-Things"
+                  },
+                  {
+                    "title": "git restore 官方手册",
+                    "url": "https://git-scm.com/docs/git-restore"
+                  },
+                  {
+                    "title": "git reset 官方手册",
+                    "url": "https://git-scm.com/docs/git-reset"
+                  },
+                  {
+                    "title": "git revert 官方手册",
+                    "url": "https://git-scm.com/docs/git-revert"
+                  },
+                  {
+                    "title": "git reflog 官方手册",
+                    "url": "https://git-scm.com/docs/git-reflog"
+                  },
+                  {
+                    "title": "git stash 官方手册",
+                    "url": "https://git-scm.com/docs/git-stash"
+                  },
+                  {
+                    "title": "git clean 官方手册",
+                    "url": "https://git-scm.com/docs/git-clean"
+                  }
+                ],
+                "practice_steps": [
+                  "制作撤销决策矩阵并逐条在一次性仓库验证",
+                  "演练 stash push -u、show、pop 与冲突处理",
+                  "先用 clean -n/-ndx 预演，记录将删除的路径",
+                  "制造不可见提交并通过 reflog 建立 rescue 分支恢复"
+                ],
+                "code_explanation": [
+                  "命令序列先读取状态和历史，再执行单一变更，最后用 status、diff、log 或测试核对结果。",
+                  "失败路径必须保留原始输出并使用 abort、reflog、备份分支或正常整合恢复，不能用删除仓库掩盖问题。"
+                ],
+                "what_it_solves": "撤销不是一个命令：restore 面向工作区/索引，reset 移动当前分支并按模式影响索引和工作区，revert 新建反向提交，reflog 记录本地引用移动。选择取决于改动所在层级和是否已经共享。",
+                "role": "在第 5 日综合任务中直接服务于：在一次性仓库分别撤销工作区、取消暂存、回退本地提交、反做已共享提交；故意丢失分支指针后用 reflog 恢复，并演练 stash 与 clean -n"
+              }
+            ],
+            "prerequisites": [
+              "已安装命令行 Git，并能在终端运行 git --version 与 git help",
+              "仅使用当天新建的无敏感信息练习仓库；涉及 hard、clean、rebase 或强制推送时先建立可核对的备份引用"
+            ],
+            "learning_objectives": [
+              "能用自己的话解释“撤销矩阵与 reflog 救援”涉及的状态和适用边界",
+              "能不看答案独立完成：在一次性仓库分别撤销工作区、取消暂存、回退本地提交、反做已共享提交；故意丢失分支指针后用 reflog 恢复，并演练 stash 与 clean -n",
+              "能根据 status、diff、日志、测试和失败输出证明结果，并选择可恢复的处理方式"
+            ],
+            "concept_map": [
+              {
+                "term": "reset",
+                "explanation": "reset 首先移动当前分支，再按模式决定是否同步索引与工作区。"
+              },
+              {
+                "term": "revert",
+                "explanation": "revert 用新提交反做既有提交，适合已共享历史。"
+              },
+              {
+                "term": "reflog",
+                "explanation": "reflog 是本地引用移动日志，可用于短期恢复但不是远程备份。"
+              }
+            ],
+            "comprehensive_task": {
+              "goal": "在一次性仓库分别撤销工作区、取消暂存、回退本地提交、反做已共享提交；故意丢失分支指针后用 reflog 恢复，并演练 stash 与 clean -n",
+              "input": "使用当天创建的一次性本地仓库、本地 bare 远程或虚构内容，不包含真实项目密钥、个人数据和未备份工作。",
+              "output": "提交命令清单、关键状态前后对照、提交图或 diff、验证结果、失败样例和恢复记录。",
+              "requirements": [
+                "先预测命令将改变工作区、索引、HEAD、本地引用还是远程引用，再执行",
+                "每个阶段都用 git status --short --branch 和相关只读命令核对",
+                "至少完成一个正常流程、一个失败或冲突流程和一个恢复流程"
+              ],
+              "error_cases": [
+                "命令结果与预测不一致时立即停止，保存状态和错误输出，不继续叠加破坏性操作",
+                "真实协作分支或已有工作目录不作为破坏性练习对象；不确定时新建仓库、分支或 worktree"
+              ]
+            },
+            "verification": {
+              "checks": [
+                "提交一张按“是否已提交、是否已共享、是否保留工作区”选择 restore/reset/revert 的决策表及每条路径证据",
+                "失败样例：在一次性仓库执行一次 reset --hard 造成提交不可见，再用 git reflog 找回并建立 rescue 分支；clean 只先运行 -n/-ndx 预演",
+                "正常路径与边界路径均已在一次性仓库复现",
+                "能闭卷解释命令改变的引用、索引或工作区状态"
+              ],
+              "evidence": [
+                "可复制的命令与关键输出记录",
+                "提交图、状态或 diff 的前后对照",
+                "失败、冲突或拒绝样例及恢复过程",
+                "不少于 150 字的当天复盘和一张新增命令决策卡"
+              ]
+            },
+            "workflow": [
+              {
+                "title": "先画状态",
+                "body": "写下当前分支、HEAD、工作区、索引和相关远程引用，预测下一条命令会改变哪一层。"
+              },
+              {
+                "title": "小步执行",
+                "body": "每次只执行一个改变状态的动作，紧接着用 status、diff、log 或测试核验。"
+              },
+              {
+                "title": "制造失败",
+                "body": "在一次性仓库主动制造一个冲突、拒绝或错误操作，保存原始输出和中间状态。"
+              },
+              {
+                "title": "恢复并闭卷",
+                "body": "用对应 abort、reflog、备份引用或正常整合恢复；关闭资料后重新完成核心流程。"
+              }
+            ],
+            "track": "git-mastery-7d"
+          }
+        },
+        {
+          "day_number": 6,
+          "phase": "第三阶段：恢复与历史整理",
+          "week_number": 1,
+          "week_title": "Git 7 日密集掌握",
+          "title": "整理本地历史并安全移植提交",
+          "core_knowledge": "rebase、interactive rebase、cherry-pick、冲突 continue/skip/abort、force-with-lease 与公开历史边界",
+          "hands_on_task": "创建含三个杂乱提交的本地主题分支，用 rebase -i 重排并合并；把一个独立修复 cherry-pick 到发布分支，制造冲突并完整演练 abort/continue",
+          "acceptance_criteria": [
+            "提交 rebase 前后图、旧新提交哈希对照、一次 squash/fixup 结果、一次 cherry-pick 结果和验证输出",
+            "失败样例：制造 rebase 或 cherry-pick 冲突，保存状态与 REBASE_HEAD/CHERRY_PICK_HEAD 信息，先 abort 恢复，再重做并 continue"
+          ],
+          "estimated_minutes": 210,
+          "track": "git-mastery-7d",
+          "content": {
+            "version": 5,
+            "knowledge_details": [
+              {
+                "name": "历史改写与提交移植",
+                "summary": "rebase 会把一组提交复制到新基线，因此提交哈希改变；interactive rebase 可重排、合并、拆分和修改本地提交。cherry-pick 复制选定提交的变更。两者都应在未共享或已协调的历史上使用。",
+                "basic": "rebase 会把一组提交复制到新基线，因此提交哈希改变；interactive rebase 可重排、合并、拆分和修改本地提交。cherry-pick 复制选定提交的变更。两者都应在未共享或已协调的历史上使用。 今天所有有风险的命令只在一次性练习仓库执行，并在改变状态前先保存 git status、git log 与必要备份引用。",
+                "mechanism": "rebase 计算待重放提交并逐个在新基线上创建新提交；冲突解决后 add，再 continue。cherry-pick 只移植指定提交。已推送分支必须确认无人基于旧历史，并用 --force-with-lease 校验远端仍是预期值。",
+                "tools": [
+                  "git rebase / rebase -i",
+                  "git rebase --continue/--abort",
+                  "git cherry-pick",
+                  "git range-diff",
+                  "git push --force-with-lease"
+                ],
+                "pitfalls": [
+                  "对公共分支直接 rebase 并裸 force push",
+                  "冲突时不看当前正在重放哪个提交",
+                  "把 cherry-pick 当长期同步分支的替代品造成重复提交"
+                ],
+                "implementation_requirement": "独立完成“创建含三个杂乱提交的本地主题分支，用 rebase -i 重排并合并；把一个独立修复 cherry-pick 到发布分支，制造冲突并完整演练 abort/continue”；每个关键步骤记录命令、执行前状态、执行后状态和恢复方式，禁止在真实工作仓库练习破坏性操作。",
+                "reference_code": "git switch -c feature/history main\n# 连续创建 feature、fix typo、fix again 三个本地提交\ngit log --oneline main..HEAD\ngit push -u origin feature/history\ngit branch backup/feature-history\ngit rebase -i main\ngit range-diff backup/feature-history...feature/history\ngit switch -c release/practice main\ngit cherry-pick <独立修复提交>\n# 制造冲突后检查 git status 与 git show REBASE_HEAD 或 CHERRY_PICK_HEAD\ngit rebase --abort\n# 重做：编辑冲突、git add <file>、git rebase --continue\n# 在 Bob 克隆推送一个协作提交，本仓库不 fetch，验证 lease 会拒绝覆盖未知远端提交\ngit push --force-with-lease origin feature/history\ngit fetch origin\ngit log --oneline --left-right feature/history...origin/feature/history",
+                "language": "text",
+                "run_command": "git log --oneline --graph --decorate --all",
+                "expected_results": [
+                  "rebase 后内容等价但提交哈希改变",
+                  "range-diff 能审查改写前后提交序列",
+                  "abort 精确回到操作前分支状态",
+                  "force-with-lease 在远端意外变化时拒绝覆盖"
+                ],
+                "mastery": [
+                  "能判断 merge、rebase、cherry-pick 各自适用场景",
+                  "能使用 pick/reword/edit/squash/fixup 整理本地提交",
+                  "能从冲突状态安全 continue、skip 或 abort",
+                  "能解释为何 --force-with-lease 比 --force 多一道并发保护"
+                ],
+                "resources": [
+                  {
+                    "title": "git rebase 官方手册",
+                    "url": "https://git-scm.com/docs/git-rebase"
+                  },
+                  {
+                    "title": "git cherry-pick 官方手册",
+                    "url": "https://git-scm.com/docs/git-cherry-pick"
+                  },
+                  {
+                    "title": "git push 官方手册",
+                    "url": "https://git-scm.com/docs/git-push"
+                  },
+                  {
+                    "title": "gitrevisions 官方手册",
+                    "url": "https://git-scm.com/docs/gitrevisions"
+                  }
+                ],
+                "practice_steps": [
+                  "创建备份分支并记录改写前提交图",
+                  "使用 interactive rebase 合并和改写本地提交",
+                  "用 range-diff 与测试核对改写前后语义",
+                  "制造冲突并演练 abort/continue，再验证 lease 拒绝边界"
+                ],
+                "code_explanation": [
+                  "命令序列先读取状态和历史，再执行单一变更，最后用 status、diff、log 或测试核对结果。",
+                  "失败路径必须保留原始输出并使用 abort、reflog、备份分支或正常整合恢复，不能用删除仓库掩盖问题。"
+                ],
+                "what_it_solves": "rebase 会把一组提交复制到新基线，因此提交哈希改变；interactive rebase 可重排、合并、拆分和修改本地提交。cherry-pick 复制选定提交的变更。两者都应在未共享或已协调的历史上使用。",
+                "role": "在第 6 日综合任务中直接服务于：创建含三个杂乱提交的本地主题分支，用 rebase -i 重排并合并；把一个独立修复 cherry-pick 到发布分支，制造冲突并完整演练 abort/continue"
+              }
+            ],
+            "prerequisites": [
+              "已安装命令行 Git，并能在终端运行 git --version 与 git help",
+              "仅使用当天新建的无敏感信息练习仓库；涉及 hard、clean、rebase 或强制推送时先建立可核对的备份引用"
+            ],
+            "learning_objectives": [
+              "能用自己的话解释“历史改写与提交移植”涉及的状态和适用边界",
+              "能不看答案独立完成：创建含三个杂乱提交的本地主题分支，用 rebase -i 重排并合并；把一个独立修复 cherry-pick 到发布分支，制造冲突并完整演练 abort/continue",
+              "能根据 status、diff、日志、测试和失败输出证明结果，并选择可恢复的处理方式"
+            ],
+            "concept_map": [
+              {
+                "term": "rebase",
+                "explanation": "rebase 重放变更并创建新提交，不是移动原提交。"
+              },
+              {
+                "term": "cherry-pick",
+                "explanation": "cherry-pick 将选定提交引入当前分支并生成新的提交身份。"
+              },
+              {
+                "term": "force-with-lease",
+                "explanation": "只有远端引用仍等于本地预期值时才允许非快进更新。"
+              }
+            ],
+            "comprehensive_task": {
+              "goal": "创建含三个杂乱提交的本地主题分支，用 rebase -i 重排并合并；把一个独立修复 cherry-pick 到发布分支，制造冲突并完整演练 abort/continue",
+              "input": "使用当天创建的一次性本地仓库、本地 bare 远程或虚构内容，不包含真实项目密钥、个人数据和未备份工作。",
+              "output": "提交命令清单、关键状态前后对照、提交图或 diff、验证结果、失败样例和恢复记录。",
+              "requirements": [
+                "先预测命令将改变工作区、索引、HEAD、本地引用还是远程引用，再执行",
+                "每个阶段都用 git status --short --branch 和相关只读命令核对",
+                "至少完成一个正常流程、一个失败或冲突流程和一个恢复流程"
+              ],
+              "error_cases": [
+                "命令结果与预测不一致时立即停止，保存状态和错误输出，不继续叠加破坏性操作",
+                "真实协作分支或已有工作目录不作为破坏性练习对象；不确定时新建仓库、分支或 worktree"
+              ]
+            },
+            "verification": {
+              "checks": [
+                "提交 rebase 前后图、旧新提交哈希对照、一次 squash/fixup 结果、一次 cherry-pick 结果和验证输出",
+                "失败样例：制造 rebase 或 cherry-pick 冲突，保存状态与 REBASE_HEAD/CHERRY_PICK_HEAD 信息，先 abort 恢复，再重做并 continue",
+                "正常路径与边界路径均已在一次性仓库复现",
+                "能闭卷解释命令改变的引用、索引或工作区状态"
+              ],
+              "evidence": [
+                "可复制的命令与关键输出记录",
+                "提交图、状态或 diff 的前后对照",
+                "失败、冲突或拒绝样例及恢复过程",
+                "不少于 150 字的当天复盘和一张新增命令决策卡"
+              ]
+            },
+            "workflow": [
+              {
+                "title": "先画状态",
+                "body": "写下当前分支、HEAD、工作区、索引和相关远程引用，预测下一条命令会改变哪一层。"
+              },
+              {
+                "title": "小步执行",
+                "body": "每次只执行一个改变状态的动作，紧接着用 status、diff、log 或测试核验。"
+              },
+              {
+                "title": "制造失败",
+                "body": "在一次性仓库主动制造一个冲突、拒绝或错误操作，保存原始输出和中间状态。"
+              },
+              {
+                "title": "恢复并闭卷",
+                "body": "用对应 abort、reflog、备份引用或正常整合恢复；关闭资料后重新完成核心流程。"
+              }
+            ],
+            "track": "git-mastery-7d"
+          }
+        },
+        {
+          "day_number": 7,
+          "phase": "第四阶段：诊断与综合验收",
+          "week_number": 1,
+          "week_title": "Git 7 日密集掌握",
+          "title": "用诊断工具完成团队工作流综合验收",
+          "core_knowledge": "bisect、blame、grep、worktree、对象与引用、fsck，以及从需求到发布和恢复的完整工作流",
+          "hands_on_task": "在含已知回归的练习仓库用 bisect 定位首个坏提交，同时用 worktree 并行修复；最后完成 fetch、主题分支、审查、冲突、发布标签、误操作恢复和仓库完整性检查",
+          "acceptance_criteria": [
+            "提交 bisect 日志、首个坏提交、worktree 列表、修复提交、发布标签、reflog 恢复记录和 git fsck --full 输出",
+            "失败样例：让自动测试在某个提交无法运行并使用 bisect skip 或手动判定；说明 blame 只给最后改行提交，不能直接证明责任或根因"
+          ],
+          "estimated_minutes": 240,
+          "track": "git-mastery-7d",
+          "content": {
+            "version": 5,
+            "knowledge_details": [
+              {
+                "name": "回归定位、并行工作区与对象完整性",
+                "summary": "bisect 在已知好坏端点间二分定位引入变化的提交；worktree 让同一仓库对象库支持多个工作目录。blame/grep 提供线索，真正结论仍需 show、测试和上下文。对象库与引用模型解释了大多数恢复操作。",
+                "basic": "bisect 在已知好坏端点间二分定位引入变化的提交；worktree 让同一仓库对象库支持多个工作目录。blame/grep 提供线索，真正结论仍需 show、测试和上下文。对象库与引用模型解释了大多数恢复操作。 今天所有有风险的命令只在一次性练习仓库执行，并在改变状态前先保存 git status、git log 与必要备份引用。",
+                "mechanism": "bisect 每次选择可显著缩小候选集的提交并根据 good/bad 继续；bisect run 可用退出码自动判断。worktree 共享对象和大部分引用但拥有独立 HEAD/索引。fsck 检查对象连通性和有效性，引用决定哪些对象可达。",
+                "tools": [
+                  "git bisect start/good/bad/run/reset",
+                  "git worktree add/list/remove",
+                  "git blame / grep / show",
+                  "git cat-file / rev-parse",
+                  "git fsck --full"
+                ],
+                "pitfalls": [
+                  "good/bad 端点定义反了导致定位无意义",
+                  "测试不稳定却交给 bisect run",
+                  "把 blame 输出当作归责结论",
+                  "手工修改 .git 对象或引用进行日常恢复"
+                ],
+                "implementation_requirement": "独立完成“在含已知回归的练习仓库用 bisect 定位首个坏提交，同时用 worktree 并行修复；最后完成 fetch、主题分支、审查、冲突、发布标签、误操作恢复和仓库完整性检查”；每个关键步骤记录命令、执行前状态、执行后状态和恢复方式，禁止在真实工作仓库练习破坏性操作。",
+                "reference_code": "git log --oneline --reverse\ngit bisect start\ngit bisect bad HEAD\ngit bisect good <已知正常提交>\n# 每轮运行确定性验证；正常 git bisect good，异常 git bisect bad，无法判断 git bisect skip\ngit bisect log\ngit show --stat\ngit bisect reset\ngit worktree add ../git-hotfix -b hotfix/regression main\ngit worktree list\ngit blame -L 1,20 -- README.md\ngit grep -n \"目标文本\" HEAD\ngit log -S\"目标文本\" --all --oneline\ngit cat-file -t HEAD\ngit cat-file -p HEAD\ngit fsck --full\n# 完成修复、合并、v1.0.0 标签和一次 reflog 恢复后移除 worktree\ngit worktree remove ../git-hotfix",
+                "language": "text",
+                "run_command": "git fsck --full",
+                "expected_results": [
+                  "bisect 能收敛到预设首个坏提交",
+                  "worktree 中分支和文件状态相互独立但对象共享",
+                  "blame 线索经 show 与测试复核",
+                  "fsck 无损坏对象且综合流程留下完整证据链"
+                ],
+                "mastery": [
+                  "能手动或自动运行 bisect 并处理 skip",
+                  "能用 worktree 并行修复而不反复 stash",
+                  "能从对象、提交、树、blob、引用解释 Git 状态",
+                  "能独立完成提交、分支、远程、冲突、恢复、改写、定位和发布闭环"
+                ],
+                "resources": [
+                  {
+                    "title": "git bisect 官方手册",
+                    "url": "https://git-scm.com/docs/git-bisect"
+                  },
+                  {
+                    "title": "git worktree 官方手册",
+                    "url": "https://git-scm.com/docs/git-worktree"
+                  },
+                  {
+                    "title": "git blame 官方手册",
+                    "url": "https://git-scm.com/docs/git-blame"
+                  },
+                  {
+                    "title": "Pro Git：Git 对象",
+                    "url": "https://git-scm.com/book/en/v2/Git-Internals-Git-Objects"
+                  },
+                  {
+                    "title": "git fsck 官方手册",
+                    "url": "https://git-scm.com/docs/git-fsck"
+                  }
+                ],
+                "practice_steps": [
+                  "准备至少八个提交且只让其中一个开始引入确定性回归",
+                  "用 bisect 手动定位一次，再用 bisect run 自动复验",
+                  "创建并行 worktree 修复，使用 blame/grep/show 补充上下文",
+                  "完成团队协作综合演练、标签发布、误操作恢复与 fsck 检查"
+                ],
+                "code_explanation": [
+                  "命令序列先读取状态和历史，再执行单一变更，最后用 status、diff、log 或测试核对结果。",
+                  "失败路径必须保留原始输出并使用 abort、reflog、备份分支或正常整合恢复，不能用删除仓库掩盖问题。"
+                ],
+                "what_it_solves": "bisect 在已知好坏端点间二分定位引入变化的提交；worktree 让同一仓库对象库支持多个工作目录。blame/grep 提供线索，真正结论仍需 show、测试和上下文。对象库与引用模型解释了大多数恢复操作。",
+                "role": "在第 7 日综合任务中直接服务于：在含已知回归的练习仓库用 bisect 定位首个坏提交，同时用 worktree 并行修复；最后完成 fetch、主题分支、审查、冲突、发布标签、误操作恢复和仓库完整性检查"
+              }
+            ],
+            "prerequisites": [
+              "已安装命令行 Git，并能在终端运行 git --version 与 git help",
+              "仅使用当天新建的无敏感信息练习仓库；涉及 hard、clean、rebase 或强制推送时先建立可核对的备份引用"
+            ],
+            "learning_objectives": [
+              "能用自己的话解释“回归定位、并行工作区与对象完整性”涉及的状态和适用边界",
+              "能不看答案独立完成：在含已知回归的练习仓库用 bisect 定位首个坏提交，同时用 worktree 并行修复；最后完成 fetch、主题分支、审查、冲突、发布标签、误操作恢复和仓库完整性检查",
+              "能根据 status、diff、日志、测试和失败输出证明结果，并选择可恢复的处理方式"
+            ],
+            "concept_map": [
+              {
+                "term": "二分定位",
+                "explanation": "bisect 依赖可靠的好坏判定，每次将候选提交集合显著缩小。"
+              },
+              {
+                "term": "worktree",
+                "explanation": "附加工作树共享对象库，但各有独立工作目录、索引和 HEAD。"
+              },
+              {
+                "term": "对象与引用",
+                "explanation": "blob、tree、commit 保存内容与关系，分支和标签等引用提供可达入口。"
+              }
+            ],
+            "comprehensive_task": {
+              "goal": "在含已知回归的练习仓库用 bisect 定位首个坏提交，同时用 worktree 并行修复；最后完成 fetch、主题分支、审查、冲突、发布标签、误操作恢复和仓库完整性检查",
+              "input": "使用当天创建的一次性本地仓库、本地 bare 远程或虚构内容，不包含真实项目密钥、个人数据和未备份工作。",
+              "output": "提交命令清单、关键状态前后对照、提交图或 diff、验证结果、失败样例和恢复记录。",
+              "requirements": [
+                "先预测命令将改变工作区、索引、HEAD、本地引用还是远程引用，再执行",
+                "每个阶段都用 git status --short --branch 和相关只读命令核对",
+                "至少完成一个正常流程、一个失败或冲突流程和一个恢复流程"
+              ],
+              "error_cases": [
+                "命令结果与预测不一致时立即停止，保存状态和错误输出，不继续叠加破坏性操作",
+                "真实协作分支或已有工作目录不作为破坏性练习对象；不确定时新建仓库、分支或 worktree"
+              ]
+            },
+            "verification": {
+              "checks": [
+                "提交 bisect 日志、首个坏提交、worktree 列表、修复提交、发布标签、reflog 恢复记录和 git fsck --full 输出",
+                "失败样例：让自动测试在某个提交无法运行并使用 bisect skip 或手动判定；说明 blame 只给最后改行提交，不能直接证明责任或根因",
+                "正常路径与边界路径均已在一次性仓库复现",
+                "能闭卷解释命令改变的引用、索引或工作区状态"
+              ],
+              "evidence": [
+                "可复制的命令与关键输出记录",
+                "提交图、状态或 diff 的前后对照",
+                "失败、冲突或拒绝样例及恢复过程",
+                "不少于 150 字的当天复盘和一张新增命令决策卡"
+              ]
+            },
+            "workflow": [
+              {
+                "title": "先画状态",
+                "body": "写下当前分支、HEAD、工作区、索引和相关远程引用，预测下一条命令会改变哪一层。"
+              },
+              {
+                "title": "小步执行",
+                "body": "每次只执行一个改变状态的动作，紧接着用 status、diff、log 或测试核验。"
+              },
+              {
+                "title": "制造失败",
+                "body": "在一次性仓库主动制造一个冲突、拒绝或错误操作，保存原始输出和中间状态。"
+              },
+              {
+                "title": "恢复并闭卷",
+                "body": "用对应 abort、reflog、备份引用或正常整合恢复；关闭资料后重新完成核心流程。"
+              }
+            ],
+            "track": "git-mastery-7d"
+          }
+        }
+      ]
     }
   ]
 }
