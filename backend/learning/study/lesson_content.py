@@ -11,7 +11,9 @@ from .teaching_content import (
 
 
 def split_knowledge_points(core_knowledge):
-    return [part.strip(" `") for part in re.split(r"[、，,/]", core_knowledge) if part.strip(" `")]
+    """按课程列表标点分隔知识点，并保留术语内部的斜杠和加号。"""
+    # 斜杠和加号是 I/O、/status、Java.perform/Java.use、C/C++ 等术语的一部分，不能当作通用分隔符。
+    return [part.strip(" `") for part in re.split(r"[、，,]", core_knowledge) if part.strip(" `")]
 
 
 def detail(
@@ -99,7 +101,7 @@ assert run.repository_clean and run.approval_required
 print(run)
 ''',
         "resources": [
-            {"title": "Codex CLI 官方文档", "url": "https://developers.openai.com/codex/cli"},
+            {"title": "Codex CLI 官方文档", "url": "https://learn.chatgpt.com/docs/codex/cli"},
             {"title": "Claude Code 官方文档", "url": "https://code.claude.com/docs/en/overview"},
             {"title": "OpenCode 官方文档", "url": "https://opencode.ai/docs/"},
         ],
@@ -383,9 +385,23 @@ VERIFIED_RESOURCES = {
     "cor": {"title": "Civic Online Reasoning", "url": "https://cor.inquirygroup.org/"},
     "unesco_mil": {"title": "UNESCO 媒体与信息素养", "url": "https://www.unesco.org/en/media-information-literacy"},
     "nist_gai": {"title": "NIST 生成式 AI 风险管理框架", "url": "https://www.nist.gov/publications/artificial-intelligence-risk-management-framework-generative-artificial-intelligence"},
+    "codex_cli": {"title": "Codex CLI 官方文档", "url": "https://learn.chatgpt.com/docs/codex/cli"},
+    "claude_install": {"title": "Claude Code 官方安装指南", "url": "https://code.claude.com/docs/en/installation"},
+    "opencode_docs": {"title": "OpenCode 官方文档", "url": "https://opencode.ai/docs/"},
+    "gemini_docs": {"title": "Gemini CLI 官方文档", "url": "https://geminicli.com/docs/"},
+    "copilot_cli": {"title": "GitHub Copilot CLI 官方安装指南", "url": "https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/install-copilot-cli"},
+    "aider_install": {"title": "Aider 官方安装指南", "url": "https://aider.chat/docs/install.html"},
+    "cline_install": {"title": "Cline 官方安装与平台说明", "url": "https://docs.cline.bot/getting-started/installing-cline"},
+    "goose_install": {"title": "goose 官方安装指南", "url": "https://block.github.io/goose/index.html"},
+    "hello_agents": {"title": "Hello-Agents 公开教程", "url": "https://github.com/datawhalechina/hello-agents"},
+    "mcp_latest": {"title": "MCP 当前架构与规范", "url": "https://modelcontextprotocol.io/specification/latest/architecture"},
+    "a2a_latest": {"title": "A2A 当前核心概念", "url": "https://a2a-protocol.org/latest/topics/key-concepts/"},
+    "owasp_agentic": {"title": "OWASP Agentic 应用安全指南", "url": "https://genai.owasp.org/resource/securing-agentic-applications-guide-1-0/"},
+    "git_docs": {"title": "Git 官方文档", "url": "https://git-scm.com/docs"},
+    "owasp_injection": {"title": "OWASP 提示注入风险", "url": "https://genai.owasp.org/llmrisk/llm01-prompt-injection/"},
 }
 
-LIFESTYLE_RESOURCE_GROUPS = {
+RESOURCE_GROUPS = {
     "finance": [
         (("征信",), ("pbccrc_query", "pbccrc_dispute", "pboc_credit_rules")),
         (("税", "专项附加"), ("tax_policy", "tax_personal", "cfpb_toolkit")),
@@ -419,18 +435,53 @@ LIFESTYLE_RESOURCE_GROUPS = {
         (("口令", "密码", "多因素", "MFA", "恢复码", "账号"), ("nist_auth", "nist_password", "ftc_hacked")),
         ((), ("cisa_world", "cisa_device", "ftc_privacy")),
     ],
+    "agent_tools": [
+        (("Codex", "AGENTS.md", "codex exec"), ("codex_cli", "git_docs", "owasp_injection")),
+        (("Claude", "CLAUDE.md", "Hooks"), ("claude_install", "git_docs", "owasp_injection")),
+        (("OpenCode",), ("opencode_docs", "git_docs", "owasp_injection")),
+        (("Gemini", "GEMINI.md"), ("gemini_docs", "git_docs", "owasp_injection")),
+        (("Copilot",), ("copilot_cli", "git_docs", "owasp_injection")),
+        (("Aider",), ("aider_install", "git_docs", "owasp_injection")),
+        (("Cline",), ("cline_install", "git_docs", "owasp_injection")),
+        (("goose",), ("goose_install", "git_docs", "owasp_injection")),
+        (("MCP", "Agent Skills", "跨工具"), ("mcp_latest", "codex_cli", "claude_install")),
+        ((), ("codex_cli", "claude_install", "opencode_docs")),
+    ],
+    "agent": [
+        (("MCP",), ("mcp_latest", "hello_agents", "owasp_agentic")),
+        (("A2A", "多智能体"), ("a2a_latest", "hello_agents", "owasp_agentic")),
+        (("安全", "提示注入", "最小权限", "人工审批"), ("owasp_agentic", "mcp_latest", "hello_agents")),
+        ((), ("hello_agents", "mcp_latest", "a2a_latest")),
+    ],
 }
 
 
 def relevant_resources(kind, point, fallback):
-    """返回与生活课程当天主题直接相关的三条已核对资料。"""
-    for keywords, resource_names in LIFESTYLE_RESOURCE_GROUPS.get(kind, []):
-        if not keywords or any(keyword.casefold() in point.casefold() for keyword in keywords):
-            return [dict(VERIFIED_RESOURCES[name]) for name in resource_names]
-    return list(fallback)
+    """返回与当天主题直接相关的三条已核对资料。"""
+    groups = RESOURCE_GROUPS.get(kind, [])
+    matches = [
+        names for keywords, names in groups
+        if keywords and any(keyword.casefold() in point.casefold() for keyword in keywords)
+    ]
+    if not matches:
+        matches = [names for keywords, names in groups if not keywords][:1]
+
+    # 合并课程可同时包含多个主题；先从每个命中组取一条，再补齐其余资料。
+    names = []
+    for index in range(max((len(items) for items in matches), default=0)):
+        for items in matches:
+            if index < len(items) and items[index] not in names:
+                names.append(items[index])
+    resources = [dict(VERIFIED_RESOURCES[name]) for name in names]
+    for item in fallback:
+        if item["url"] not in {resource["url"] for resource in resources}:
+            resources.append(dict(item))
+    return resources[:3]
 
 
 def track_key(track, point, task):
+    if track in TRACK_GUIDES:
+        return track
     if track == "coding-agent-tools-60d":
         return "agent_tools"
     if track == "agent-engineering-60d":
@@ -571,7 +622,7 @@ def build_lesson_content(day_number, core_knowledge, task, criteria, track=""):
         ]
     }
     return {
-        "version": 6,
+        "version": 7,
         "track": track,
         "knowledge_details": details,
         **teaching,

@@ -392,7 +392,7 @@ bash deployment/deploy.sh
 
 ## 课程导入
 
-系统课程正文保存在版本化目录 `backend/data/system_roadmaps.v2.json`，当前内容版本为 6，其中 Python 课程与示例以 3.12 为内容基线；生产镜像和新建 Conda 环境使用 Python 3.13，可正常覆盖该课程基线。目录包含一条 42 日采集/Web/Android 综合路线、十一条 30 日专项路线和一条 Git 7 日密集路线，共 379 个学习日。学习者参考资料只保留公开官方文档；`docs/详细学习课件/` 保存的是编排依据与上一版核验快照，不参与运行时导入。导入命令会校验内容版本、课程分类和私有资料地址，并使用 `update_or_create` 幂等更新全部十三条路线：
+系统课程正文保存在版本化目录 `backend/data/system_roadmaps.v2.json`，当前内容版本为 7，其中 Python 课程与示例以 3.12 为内容基线；生产镜像和新建 Conda 环境使用 Python 3.13，可正常覆盖该课程基线。目录包含一条 42 日采集/Web/Android 综合路线、十一条 30 日专项路线和一条 Git 7 日密集路线，共 379 个学习日。学习者参考资料只保留公开官方文档；`docs/详细学习课件/` 保存的是编排依据与上一版核验快照，不参与运行时导入。导入命令会校验内容版本、课程分类和私有资料地址，并使用 `update_or_create` 幂等更新全部十三条路线：
 
 ```powershell
 python backend/manage.py import_curated_roadmaps

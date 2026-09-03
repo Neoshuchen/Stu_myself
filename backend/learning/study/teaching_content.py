@@ -40,7 +40,7 @@ TERM_NOTES = {
         ("沉淀基金", "沉淀基金把可预见的大额支出按剩余月份分摊，例如保险、维修和旅行，使低频支出不再挤占应急储备。"),
         ("应急金", "应急金服务于失业、医疗或必要维修等不可预见事件，应关注安全性和可取用性；目标金额取决于基本支出、收入稳定性和家庭责任。"),
         ("债务", "债务评估至少记录剩余本金、年化成本、最低还款、到期日、违约后果和提前还款条件，再决定优先级。"),
-        ("年化成本", "日利率、月费率和分期手续费必须换算到同一时间口径，并把服务费、违约金和复利规则纳入总成本。"),
+        ("年化成本", "债务年化成本应按实际收付现金流计算 APR 或内部收益率，同时纳入手续费和复利规则；把月费率简单乘 12 只是名义换算，不等于真实年化成本。"),
         ("征信", "征信记录应通过所在地官方渠道查询，发现错误按正规异议流程处理；任何承诺删除真实负面记录的“征信修复”都需高度警惕。"),
         ("合同", "签署金融合同前核对交易实质、总成本、期限、退出条件、违约责任、争议渠道和个人信息授权；不在催促下完成刷脸、验证码或共享屏幕。"),
         ("保险", "保险用于转移本人难以承受的特定损失，不等同于储蓄或保证收益；先确认保障需求，再看责任、除外、等待期、免赔额、续保和退保损失。"),
@@ -109,6 +109,7 @@ TERM_NOTES = {
         ("链接", "检查链接时关注实际域名、协议、拼写和跳转，短链与二维码先在隔离环境解析；页面外观相似不能证明归属。"),
         ("社会工程", "社会工程攻击人的信任和流程缺口；验证码、远程控制、共享屏幕、秘密转账和绕过正规渠道都是高风险请求。"),
         ("备份", "备份至少要与原设备故障隔离，并定期恢复抽查；只看到同步成功图标不能证明历史版本和恢复密钥可用。"),
+        ("3-2-1", "3-2-1 是备份设计基线：保留 3 份数据、使用 2 类介质或隔离故障域、至少 1 份异地；还要结合离线或不可变副本和定期恢复演练。"),
         ("加密", "加密保护设备丢失或介质被读取时的数据，但恢复密钥丢失也可能造成永久数据损失；先备份并单独保存恢复材料。"),
         ("事件响应", "账号或设备异常时先隔离风险、保留证据、从可信设备改密和撤销会话，再联系平台、金融机构或执法渠道并复盘入口。"),
         ("横向阅读", "横向阅读会离开当前页面，在新标签搜索发布者、原始来源和其他独立报道，避免被单个页面的设计和自我介绍困住。"),
@@ -136,7 +137,7 @@ TERM_NOTES = {
         ("Gemini 沙箱", "Gemini CLI 可使用沙箱隔离有副作用的工具；沙箱、可信目录和审批分别控制执行环境、上下文信任与动作授权，三者不能互相替代。"),
         ("Copilot CLI", "GitHub Copilot CLI 可通过 npm、WinGet 或 Homebrew 安装，首次运行 `copilot` 后用 `/login` 认证；组织账号还需确认管理员策略是否允许 CLI。"),
         ("Aider", "Aider 官方优先推荐隔离安装方式，例如 aider-install、uv tool 或 pipx；进入 Git 仓库后再选择模型和 Provider，并先核对版本与仓库状态。"),
-        ("Cline", "Cline 可作为 IDE 扩展或 CLI 使用；CLI 需要 Node.js 20+，安装后执行 `cline auth`，IDE 中则要先审查 Provider、自动批准和工作区访问设置。"),
+        ("Cline", "Cline 可作为 IDE 扩展或 CLI 使用；当前 CLI 仍是 macOS/Linux 预览版且需要 Node.js 20+，原生 Windows 应使用 IDE 扩展，或在 WSL/Linux 中运行 `cline auth`。"),
         ("goose", "goose 提供桌面端与 CLI，并通过 Provider、MCP 扩展和 ACP 连接能力；Windows 安装要按当前官方前置条件核对 Shell、PATH 与凭据存储。"),
         ("安装来源", "安装前只从产品官网、官方包仓库或官方发布页取得命令；管道执行远程脚本前先下载、检查来源和内容，并保存版本与卸载路径。"),
         ("版本核对", "安装完成后同时记录命令路径、版本、运行时和更新渠道；排障先确认当前调用的不是旧 PATH、别名或另一个环境中的同名程序。"),
@@ -164,7 +165,7 @@ TERM_NOTES = {
         ("结构化输出", "结构化输出只约束模型返回形状，反序列化后仍要进行类型、范围、权限和业务校验。"),
         ("工具", "工具把可执行能力暴露给模型；名称、描述和参数模式决定模型能否正确选择，执行器仍是最终安全边界。"),
         ("JSON Schema", "JSON Schema 描述工具参数的类型和必需字段，但授权、幂等、超时和副作用仍需业务代码控制。"),
-        ("ReAct", "ReAct 交替进行推理、行动和观察，使计划能依据真实工具结果动态修正。"),
+        ("ReAct", "ReAct 使行动与环境观察交替进行，以便依据真实工具结果动态修正。审计时保留行动、参数、观察和简要决策依据，不要要求或持久化模型私有思维链。"),
         ("Plan-and-Solve", "Plan-and-Solve 先产生可检查的计划再逐步执行，适合结构清晰的多步骤任务。"),
         ("Reflection", "Reflection 用执行、评审、修订循环改进结果，应设置轮数上限并用外部验收防止自我确认。"),
         ("LangGraph", "LangGraph 用显式状态和图节点描述长时程执行，检查点与中断让流程可以恢复和人工审批。"),
@@ -262,7 +263,9 @@ TERM_NOTES = {
         ("Promise", "Promise 状态只能从 pending 变为 fulfilled 或 rejected；then/catch 创建新的 Promise 链。"),
         ("事件循环", "同步栈清空后先执行微任务，再进入下一宏任务；这决定异步日志与签名参数的先后顺序。"),
         ("编码", "字符串、UTF-8 字节、十六进制和 Base64 是不同表示；加密前后必须对齐字节语义。"),
+        ("Base64", "Base64 只是把二进制数据表示为 ASCII 文本的可逆编码，不提供机密性、完整性或身份验证；JavaScript 处理 Unicode 文本时应先明确转为 UTF-8 字节。"),
         ("摘要", "摘要把任意长度输入映射为固定长度结果且不可逆；复现时要对齐编码、盐和输出格式。"),
+        ("MD5", "MD5 已不能提供抗碰撞安全性，不应用于新系统的完整性签名或口令保护；课程只用它识别遗留协议并与历史样本对拍。"),
         ("AES", "AES 是 16 字节分组的对称加密；密钥、模式、IV、填充和输出编码缺一项都无法对拍。"),
         ("Network", "从目标请求字段反查 Initiator 和调用栈，能找到字段首次生成位置而不是猜函数名。"),
         ("断点", "条件/XHR/DOM 断点在满足事件时暂停；暂停后用 Scope 和 Call Stack 验证数据来源。"),
@@ -281,6 +284,7 @@ TERM_NOTES = {
         ("抓包", "代理抓包只观察经过该网络栈且信任证书的流量；失败要区分代理、信任链与证书锁定。"),
         ("Frida", "Frida 把脚本注入目标进程；spawn 决定启动前注入，attach 连接已运行进程。"),
         ("Java.perform", "Java.perform 等待 ART 可用并进入正确线程上下文，Java.use 才能取得类包装器。"),
+        ("Java.use", "Java.use 根据当前 ClassFactory/ClassLoader 取得 Java 类包装器；找不到类时先核对进程和 ClassLoader，不要把它误解为 Java 语言的普通类创建。"),
         ("Hook", "Hook 方法时必须选对 ClassLoader 和 overload，并决定是否调用原方法以保持应用行为。"),
         ("JNI", "JNI 是 Java 与 native 代码边界；native 方法可按名称导出，也可在运行时动态注册。"),
         ("ELF", "Android so 是 ELF 文件，导入导出、字符串和交叉引用能提供 native 入口候选。"),
@@ -360,9 +364,12 @@ def infer_accelerated_kind(text):
 
 def prerequisites(kind, day_number):
     """返回指定课程类型和学习日的可验证前置要求。"""
-    result = STAGE_PREREQUISITES.get(kind, [(1, "具备上一学习日要求的基础")])[0][1]
-    for start, note in STAGE_PREREQUISITES.get(kind, []):
-        if day_number >= start:
+    stages = STAGE_PREREQUISITES.get(kind, [(1, "具备上一学习日要求的基础")])
+    # 现有专项路线由 60 日合并为 30 日，阶段节点也必须按相同比例换算。
+    stage_day = day_number * 2 if stages[-1][0] > 30 else day_number
+    result = stages[0][1]
+    for start, note in stages:
+        if stage_day >= start:
             result = note
     if day_number == 1:
         return [result]
@@ -373,14 +380,14 @@ def prerequisites(kind, day_number):
 
 def concept_notes(kind, core):
     """把课程核心术语映射为经过编辑核对的概念解释。"""
-    terms = [part.strip(" `") for part in re.split(r"[、，,/+]", core) if part.strip(" `")]
+    # 只按列表标点分项；保留 I/O、/status、Java.perform/Java.use 和 C/C++ 等完整术语。
+    terms = [part.strip(" `") for part in re.split(r"[、，,]", core) if part.strip(" `")]
     notes = []
     unmatched = []
     for term in terms:
-        match = next((note for key, note in TERM_NOTES.get(kind, []) if keyword_matches(key, term)), None)
-        # 生活课程只展示与当天主题直接匹配的编辑说明，避免用泛化套话冒充具体知识。
-        if kind in LIFESTYLE_TRACKS and not match:
-            continue
+        matches = [(key, note) for key, note in TERM_NOTES.get(kind, []) if keyword_matches(key, term)]
+        # 优先最具体的词，避免 Java.use 被较短的 Java 解释抢先命中。
+        match = max(matches, key=lambda item: len(item[0]))[1] if matches else None
         if match:
             existing = next((item for item in notes if item["explanation"] == match), None)
             if existing:
@@ -389,10 +396,10 @@ def concept_notes(kind, core):
                 notes.append({"term": term, "explanation": match})
         else:
             unmatched.append(term)
-    # 多个未收录术语属于同一个当天主题，只给一次通用导读，避免逐词复制同一句模板。
+    # 未收录的相关术语合并成一张应用导读，既不遗漏当天范围，也不为每个词复制同一段套话。
     if unmatched:
         combined = "、".join(unmatched)
-        notes.append({"term": combined, "explanation": FALLBACK_CONCEPT_NOTES[kind].format(term=combined)})
+        notes.append({"term": f"关联术语：{combined}", "explanation": FALLBACK_CONCEPT_NOTES[kind].format(term=combined)})
     return notes or [{"term": core, "explanation": FALLBACK_CONCEPT_NOTES[kind].format(term=core)}]
 
 
@@ -424,7 +431,7 @@ AGENT_TOOL_EXAMPLES = [
         "# 选择与账号匹配的认证方式；先检查可信目录、GEMINI.md 与沙箱设置。",
     ]), ["稳定版 npm 包和版本命令用于建立可复现安装记录。", "个人登录、API Key 与 Vertex AI 的身份和数据边界不同，不能混用配置。"]),
     (("Copilot CLI",), code([
-        "winget install GitHub.Copilot", "copilot --version", "copilot", "# 首次进入后运行 /login、/help，并确认目录信任提示。",
+        "winget install GitHub.Copilot", "copilot version", "copilot", "# 首次进入后运行 /login、/help，并确认目录信任提示。",
         "# 非交互模式先用只读问题验证输出和退出码，再接入脚本。",
     ]), ["组织账号需先确认管理员已启用 Copilot CLI 策略。", "目录信任和显式批准是首次使用的重要边界，自动化不能绕过。"]),
     (("Aider",), code([
@@ -432,8 +439,10 @@ AGENT_TOOL_EXAMPLES = [
         "# 在练习仓库启动 aider，先选择 Provider/模型并限制加入上下文的文件。",
     ]), ["aider-install 会把 Aider 放入隔离环境，避免污染项目依赖。", "Aider 与 Git 深度集成，开始前和每轮修改后都要核对提交与 diff。"]),
     (("Cline",), code([
-        "npm install -g cline", "cline --version", "cline auth", "cline", "# IDE 用户改为从官方扩展市场安装，并先关闭宽泛自动批准。",
-    ]), ["CLI 与 IDE 扩展是不同入口，先选择一种完成最小闭环。", "Provider、Rules、自动批准和工作区范围应分别检查。"]),
+        "code --list-extensions",
+        "# 原生 Windows：从官方 IDE 扩展市场安装 Cline。",
+        "# macOS/Linux/WSL 预览 CLI：npm install -g cline，再运行 cline auth 和 cline version。",
+    ]), ["当前原生 Windows 使用 IDE 扩展；CLI 实验放在官方支持的 macOS/Linux 或 WSL 环境。", "Provider、Rules、自动批准和工作区范围应分别检查。"]),
     (("goose",), code([
         "goose --version", "goose configure", "# Windows 先按当前官方文档选择桌面端或满足前置条件的 CLI 安装。",
         "# 只启用完成练习所需的 Provider 和扩展，再运行只读项目说明任务。",
@@ -802,10 +811,11 @@ EXAMPLES = {
 def keyword_matches(keyword, text):
     if keyword.isascii() and keyword.replace(".", "").replace("_", "").isalnum():
         return re.search(rf"(?<![A-Za-z0-9_]){re.escape(keyword)}(?![A-Za-z0-9_])", text, re.IGNORECASE) is not None
-    # 中文短词若在任意位置模糊命中，容易让“不可变对象”错误选择“变量与对象”示例。
-    # 仅匹配知识点分项的开头，仍可覆盖“异常链”“生成器表达式”等自然扩展。
-    terms = [part.strip(" `") for part in re.split(r"[、，,/+]", text) if part.strip(" `")]
-    return any(term.casefold().startswith(keyword.casefold()) for term in terms)
+    # 中文短词若在任意位置模糊命中，容易让“不可变对象”错误选择“变量”示例。
+    # 只接受分项前缀或后缀，覆盖“异常链”和“连接超时”，但不在词中间猜测。
+    terms = [part.strip(" `") for part in re.split(r"[、，,]", text) if part.strip(" `")]
+    lowered = keyword.casefold()
+    return any(term.casefold().startswith(lowered) or term.casefold().endswith(lowered) for term in terms)
 
 
 def fallback_example(kind, text):
@@ -896,9 +906,9 @@ def example_for(kind, text):
             "Claude Code": "claude --version",
             "OpenCode": "opencode --version",
             "Gemini CLI": "gemini --version",
-            "Copilot CLI": "copilot --version",
+            "Copilot CLI": "copilot version",
             "Aider": "aider --version",
-            "Cline": "cline --version",
+            "Cline": "code --list-extensions",
             "goose": "goose --version",
         }
         product_matches = [

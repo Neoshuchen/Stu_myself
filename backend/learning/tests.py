@@ -23,7 +23,7 @@ from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
 from PIL import Image
 
 from .accounts.email_verification import EmailVerificationError, _send_verification_email, consume_verification_code
-from .study.lesson_content import build_lesson_content
+from .study.lesson_content import build_lesson_content, split_knowledge_points
 from .models import AIProviderCredential, BuddyProfile, CommunityComment, CommunityPost, CommunityPostImage, CommunityReport, Contribution, CourseSuggestion, DayProgress, Enrollment, Evidence, Gap, HelpSession, LearningPlan, Notification, PeerReview, PlanDay, ReviewAttempt, StudyGroup, TeamChallenge, TeamChallengeEntry, WeeklyContract, current_week_start
 from .ai.providers import ProviderResult
 from .ai.services import encrypt_api_key
@@ -40,7 +40,7 @@ class LessonContentTests(TestCase):
             "health-emergency-60d": ("睡眠", "填写健康练习表", "nhc.gov.cn"),
             "communication-problem-solving-60d": ("积极倾听", "沟通角色演练", "digital.gov"),
             "digital-safety-literacy-60d": ("多因素认证", "数字安全检查", "nist.gov"),
-            "coding-agent-tools-60d": ("Codex CLI", "codex --version", "developers.openai.com"),
+            "coding-agent-tools-60d": ("Codex CLI", "codex --version", "learn.chatgpt.com"),
             "agent-engineering-60d": ("ReAct", "python practice.py", "github.com/datawhalechina/hello-agents"),
             "python-foundation-60d": ("变量绑定", "python practice.py", "docs.python.org"),
             "web-scraping-foundation-60d": ("Cookie与Session", "python practice.py", "requests.readthedocs.io"),
@@ -83,13 +83,22 @@ class LessonContentTests(TestCase):
             self.assertNotIn("应放进安全场景理解", serialized)
             self.assertTrue(any(source in item["url"] for item in content["knowledge_details"][0]["resources"]))
 
+    def test_compact_track_keys_use_their_own_examples_and_sources(self):
+        content = build_lesson_content(
+            3, "Network、Headers、Payload、Preview", "在本地靶场定位一个列表接口", ["请求可复现"], "crawler",
+        )
+        detail = content["knowledge_details"][0]
+        self.assertIn("requests", detail["tools"])
+        self.assertTrue(any("requests.readthedocs.io" in item["url"] for item in detail["resources"]))
+
     def test_agent_tool_examples_do_not_cross_product_boundaries(self):
         cases = {
             "OpenCode、/init、AGENTS.md": "opencode --version",
             "Claude Code、Agent Skills、子代理": "claude --version",
             "Aider、Repo Map、Provider": "aider-install",
-            "Cline、CLI、Provider": "npm install -g cline",
+            "Cline、CLI、Provider": "原生 Windows：从官方 IDE 扩展市场安装 Cline",
             "goose、Provider、ACP": "goose --version",
+            "Copilot CLI、WinGet、/login": "copilot version",
         }
         for point, command in cases.items():
             content = build_lesson_content(30, point, "完成工具练习", ["命令可核对"], "coding-agent-tools-60d")
@@ -110,6 +119,26 @@ class LessonContentTests(TestCase):
         sections = [detail[key] for key in ("summary", "what_it_solves", "basic", "mechanism", "role")]
         self.assertEqual(len(sections), len(set(sections)))
 
+    def test_technical_terms_keep_symbols_and_use_the_most_specific_reviewed_note(self):
+        self.assertEqual(
+            split_knowledge_points("I/O 并发、/status 与 /model、C/C++"),
+            ["I/O 并发", "/status 与 /model", "C/C++"],
+        )
+        android = build_lesson_content(
+            18, "Java.use、ClassLoader", "在本人 Debug App 中核对类加载器", ["结果可复现"], "android-reverse-60d",
+        )
+        explanation = android["concept_map"][0]["explanation"]
+        self.assertIn("ClassFactory/ClassLoader", explanation)
+        self.assertNotIn("读懂类型、分支", explanation)
+
+    def test_reviewed_concepts_keep_one_combined_fallback_and_follow_thirty_day_stages(self):
+        content = build_lesson_content(
+            7, "函数、未收录占位词", "完成可执行练习", ["结果可复现"], "python-foundation-60d",
+        )
+        self.assertEqual([item["term"] for item in content["concept_map"]], ["函数", "关联术语：未收录占位词"])
+        self.assertEqual(sum(item["explanation"].startswith("“") for item in content["concept_map"]), 1)
+        self.assertIn("容器、条件与循环", content["prerequisites"][0])
+
 
 class CuratedRoadmapTests(TestCase):
     def test_eleven_roadmaps_each_have_thirty_concrete_days(self):
@@ -129,7 +158,7 @@ class CuratedRoadmapTests(TestCase):
         for plan in SYSTEM_ROADMAPS:
             for day in plan["days"]:
                 content = day["content"]
-                self.assertEqual(content["version"], 6)
+                self.assertEqual(content["version"], 7)
                 self.assertEqual(len(content["knowledge_details"]), 1)
                 self.assertTrue(content["prerequisites"])
                 self.assertEqual(len(content["learning_objectives"]), 3)
@@ -137,7 +166,11 @@ class CuratedRoadmapTests(TestCase):
                 self.assertTrue(content["verification"]["evidence"])
                 concept_explanations = [item["explanation"] for item in content.get("concept_map", [])]
                 self.assertEqual(len(concept_explanations), len(set(concept_explanations)))
+                generic_notes = [text for text in concept_explanations if text.startswith("“")]
+                self.assertLessEqual(len(generic_notes), 1)
                 for item in content["knowledge_details"]:
+                    sections = [item[key] for key in ("summary", "what_it_solves", "basic", "mechanism", "role")]
+                    self.assertEqual(len(sections), len(set(sections)))
                     self.assertTrue(item["run_command"], f"{plan['slug']} Day {day['day_number']} 缺少运行命令")
                     self.assertGreaterEqual(len(item["practice_steps"]), 4)
                     self.assertGreaterEqual(len(item["resources"]), 3)
@@ -156,7 +189,7 @@ class CuratedRoadmapTests(TestCase):
         self.assertTrue(plan.is_published)
         self.assertEqual(plan.review_status, LearningPlan.ReviewStatus.APPROVED)
         first_detail = plan.days.get(day_number=1).knowledge_details()[0]
-        self.assertEqual(plan.days.get(day_number=1).content["version"], 6)
+        self.assertEqual(plan.days.get(day_number=1).content["version"], 7)
         self.assertEqual(first_detail["run_command"], "python practice.py")
         self.assertTrue(first_detail["resources"])
         tools_plan = LearningPlan.objects.get(slug="coding-agent-tools-60d")
@@ -203,6 +236,8 @@ class CuratedRoadmapTests(TestCase):
         self.assertEqual(sum(len(plan["days"]) for plan in SYSTEM_ROADMAPS), 379)
         serialized = json.dumps(SYSTEM_ROADMAPS, ensure_ascii=False)
         self.assertNotIn("yuque.com", serialized.casefold())
+        for broken_term in ("、I、O", "I、O", "与、model", "与、login", "Thought-Action-Observation"):
+            self.assertNotIn(broken_term, serialized)
         self.assertIn("Python 3.12", serialized)
         self.assertNotIn("Python 3.10", serialized)
         accelerated = next(plan for plan in SYSTEM_ROADMAPS if plan["slug"] == "web-reverse-android-accelerated")
@@ -236,6 +271,7 @@ class CuratedRoadmapTests(TestCase):
         for obsolete in (
             "modelcontextprotocol.io/specification/2025-06-18",
             "developers.openai.com/codex/security",
+            "block.github.io/goose/docs/getting-started/installation/",
             "www.nhc.gov.cn/xcs/c100122/202401/",
         ):
             self.assertNotIn(obsolete, serialized)
@@ -258,6 +294,15 @@ class CuratedRoadmapTests(TestCase):
         )
         self.assertIn("config.toml", codex_config_day["core_knowledge"])
         self.assertIn("项目", codex_config_day["hands_on_task"])
+        cline_day = next(day for day in routes["coding-agent-tools-60d"]["days"] if "Cline 安装" in day["title"])
+        cline_detail = cline_day["content"]["knowledge_details"][0]
+        self.assertIn("原生 Windows", cline_day["hands_on_task"])
+        self.assertTrue(any("docs.cline.bot" in item["url"] for item in cline_detail["resources"]))
+        copilot_day = next(
+            day for day in routes["coding-agent-tools-60d"]["days"] if "Copilot 交互" in day["title"]
+        )
+        self.assertIn("copilot version", copilot_day["content"]["knowledge_details"][0]["reference_code"])
+        self.assertNotIn("copilot --version", copilot_day["content"]["knowledge_details"][0]["reference_code"])
 
     def test_catalog_v1_migrates_python_baseline_and_future_versions_fail(self):
         migrated = migrate_catalog({
@@ -268,7 +313,7 @@ class CuratedRoadmapTests(TestCase):
         self.assertEqual(migrated["schema_version"], 2)
         self.assertNotIn("runtime", migrated)
         self.assertEqual(migrated["course_baseline"]["python"], "3.12")
-        self.assertEqual(migrated["content_version"], 6)
+        self.assertEqual(migrated["content_version"], 7)
         self.assertEqual(migrated["roadmaps"][0]["summary"], "使用Python 3.12")
         with self.assertRaises(CatalogError):
             migrate_catalog({"schema_version": 99})
