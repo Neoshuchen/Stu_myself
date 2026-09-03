@@ -13,6 +13,7 @@ from django.core import mail
 from django.core.cache import caches
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.db import connection
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
@@ -94,32 +95,48 @@ class LessonContentTests(TestCase):
             content = build_lesson_content(30, point, "完成工具练习", ["命令可核对"], "coding-agent-tools-60d")
             self.assertIn(command, content["knowledge_details"][0]["reference_code"])
 
+    def test_concept_map_and_detail_sections_do_not_repeat_template_text(self):
+        content = build_lesson_content(
+            3,
+            "Network、Headers、Payload、Preview",
+            "在本地靶场定位一个列表接口",
+            ["请求可复现", "失败路径可解释"],
+            "web-scraping-foundation-60d",
+        )
+        concept_map = {item["term"]: item["explanation"] for item in content["concept_map"]}
+        self.assertEqual(set(concept_map), {"Network", "Headers", "Payload", "Preview"})
+        self.assertEqual(len(set(concept_map.values())), 4)
+        detail = content["knowledge_details"][0]
+        sections = [detail[key] for key in ("summary", "what_it_solves", "basic", "mechanism", "role")]
+        self.assertEqual(len(sections), len(set(sections)))
+
 
 class CuratedRoadmapTests(TestCase):
-    def test_eleven_roadmaps_each_have_sixty_concrete_days(self):
-        curated = [plan for plan in SYSTEM_ROADMAPS if plan["total_days"] == 60]
+    def test_eleven_roadmaps_each_have_thirty_concrete_days(self):
+        curated = [plan for plan in SYSTEM_ROADMAPS if plan["total_days"] == 30]
         self.assertEqual(len(curated), 11)
         self.assertEqual(len({plan["slug"] for plan in curated}), 11)
         for plan in curated:
-            self.assertEqual(plan["total_days"], 60)
-            self.assertEqual([day["day_number"] for day in plan["days"]], list(range(1, 61)))
+            self.assertEqual(plan["total_days"], 30)
+            self.assertEqual([day["day_number"] for day in plan["days"]], list(range(1, 31)))
             for day in plan["days"]:
                 self.assertTrue(day["core_knowledge"])
                 self.assertTrue(day["hands_on_task"])
                 self.assertGreaterEqual(len(day["acceptance_criteria"]), 2)
-                self.assertIn("失败样例", day["acceptance_criteria"][1])
+                self.assertTrue(any(marker in day["acceptance_criteria"][1] for marker in ("失败", "边界", "风险")))
 
     def test_every_curated_detail_has_practice_evidence_and_sources(self):
-        curated = [plan for plan in SYSTEM_ROADMAPS if plan["slug"] != "web-reverse-android-accelerated"]
-        for plan in curated:
+        for plan in SYSTEM_ROADMAPS:
             for day in plan["days"]:
                 content = day["content"]
-                self.assertEqual(content["version"], 5)
+                self.assertEqual(content["version"], 6)
                 self.assertEqual(len(content["knowledge_details"]), 1)
                 self.assertTrue(content["prerequisites"])
                 self.assertEqual(len(content["learning_objectives"]), 3)
                 self.assertTrue(content["comprehensive_task"]["error_cases"])
                 self.assertTrue(content["verification"]["evidence"])
+                concept_explanations = [item["explanation"] for item in content.get("concept_map", [])]
+                self.assertEqual(len(concept_explanations), len(set(concept_explanations)))
                 for item in content["knowledge_details"]:
                     self.assertTrue(item["run_command"], f"{plan['slug']} Day {day['day_number']} 缺少运行命令")
                     self.assertGreaterEqual(len(item["practice_steps"]), 4)
@@ -133,19 +150,20 @@ class CuratedRoadmapTests(TestCase):
         call_command("import_curated_roadmaps", verbosity=0)
         call_command("import_curated_roadmaps", verbosity=0)
         self.assertEqual(LearningPlan.objects.filter(creator__isnull=True).count(), 13)
-        self.assertEqual(PlanDay.objects.filter(plan__creator__isnull=True).count(), 849)
+        self.assertEqual(PlanDay.objects.filter(plan__creator__isnull=True).count(), 379)
         plan = LearningPlan.objects.get(slug="python-foundation-60d")
-        self.assertEqual(plan.days.count(), 60)
+        self.assertEqual(plan.days.count(), 30)
         self.assertTrue(plan.is_published)
         self.assertEqual(plan.review_status, LearningPlan.ReviewStatus.APPROVED)
         first_detail = plan.days.get(day_number=1).knowledge_details()[0]
-        self.assertEqual(plan.days.get(day_number=1).content["version"], 5)
+        self.assertEqual(plan.days.get(day_number=1).content["version"], 6)
         self.assertEqual(first_detail["run_command"], "python practice.py")
         self.assertTrue(first_detail["resources"])
         tools_plan = LearningPlan.objects.get(slug="coding-agent-tools-60d")
-        self.assertEqual(tools_plan.days.count(), 60)
+        self.assertEqual(tools_plan.days.count(), 30)
         self.assertEqual(tools_plan.days.get(day_number=1).content["track"], "coding-agent-tools-60d")
-        self.assertEqual(tools_plan.days.get(day_number=8).knowledge_details()[0]["run_command"], "codex --version")
+        codex_days = tools_plan.days.filter(core_knowledge__icontains="Codex CLI")
+        self.assertTrue(any(day.knowledge_details()[0]["run_command"] == "codex --version" for day in codex_days))
         life_routes = {
             "personal-finance-60d": "填写财务练习表并复核合计",
             "health-emergency-60d": "填写健康练习表并完成安全边界核对",
@@ -154,22 +172,46 @@ class CuratedRoadmapTests(TestCase):
         }
         for slug, command in life_routes.items():
             plan = LearningPlan.objects.get(slug=slug)
-            self.assertEqual(plan.days.count(), 60)
+            self.assertEqual(plan.days.count(), 30)
             self.assertEqual(plan.days.get(day_number=1).content["track"], slug)
             self.assertEqual(plan.days.get(day_number=8).knowledge_details()[0]["run_command"], command)
 
+    def test_import_refuses_to_delete_obsolete_days_with_user_data(self):
+        call_command("import_curated_roadmaps", slug="python-foundation-60d", verbosity=0)
+        plan = LearningPlan.objects.get(slug="python-foundation-60d")
+        obsolete = PlanDay.objects.create(
+            plan=plan,
+            day_number=31,
+            phase="旧阶段",
+            week_number=6,
+            week_title="旧内容",
+            title="已有进度的旧学习日",
+            core_knowledge="迁移保护",
+            hands_on_task="保留用户记录",
+            acceptance_criteria=["记录仍存在"],
+        )
+        learner = User.objects.create_user(username="catalog-learner", password="safe-password-123")
+        enrollment = Enrollment.objects.create(user=learner, plan=plan)
+        DayProgress.objects.create(enrollment=enrollment, plan_day=obsolete)
+
+        with self.assertRaises(CommandError):
+            call_command("import_curated_roadmaps", slug=plan.slug, verbosity=0)
+        self.assertTrue(PlanDay.objects.filter(pk=obsolete.pk).exists())
+
     def test_versioned_catalog_contains_thirteen_routes_and_python_312_content(self):
         self.assertEqual(len(SYSTEM_ROADMAPS), 13)
-        self.assertEqual(sum(len(plan["days"]) for plan in SYSTEM_ROADMAPS), 849)
+        self.assertEqual(sum(len(plan["days"]) for plan in SYSTEM_ROADMAPS), 379)
         serialized = json.dumps(SYSTEM_ROADMAPS, ensure_ascii=False)
         self.assertNotIn("yuque.com", serialized.casefold())
         self.assertIn("Python 3.12", serialized)
         self.assertNotIn("Python 3.10", serialized)
         accelerated = next(plan for plan in SYSTEM_ROADMAPS if plan["slug"] == "web-reverse-android-accelerated")
         tracks = {day["day_number"]: day["track"] for day in accelerated["days"]}
-        self.assertEqual(tracks[4], "javascript")
-        self.assertEqual(tracks[12], "python")
-        self.assertEqual(tracks[57], "android")
+        self.assertEqual(accelerated["total_days"], 42)
+        self.assertEqual(tracks[1], "python")
+        self.assertEqual(tracks[3], "crawler")
+        self.assertEqual(tracks[8], "javascript")
+        self.assertEqual(tracks[29], "android")
 
     def test_git_route_covers_seven_days_with_official_sources_and_recovery(self):
         plan = next(plan for plan in SYSTEM_ROADMAPS if plan["slug"] == "git-mastery-7d")
@@ -200,7 +242,7 @@ class CuratedRoadmapTests(TestCase):
 
         lifestyle_slugs = new_slugs - {"agent-engineering-60d", "coding-agent-tools-60d"}
         lifestyle_days = [day for slug in lifestyle_slugs for day in routes[slug]["days"]]
-        self.assertEqual(len(lifestyle_days), 240)
+        self.assertEqual(len(lifestyle_days), 120)
         for day in lifestyle_days:
             detail = day["content"]["knowledge_details"][0]
             lifestyle_content = json.dumps(day["content"], ensure_ascii=False)
@@ -210,8 +252,10 @@ class CuratedRoadmapTests(TestCase):
 
         agent_days = routes["agent-engineering-60d"]["days"]
         self.assertEqual(agent_days[2]["title"], "区分模型调用与会话状态")
-        self.assertEqual(agent_days[26]["title"], "实践 Hello-Agents GSSC 上下文流水线")
-        codex_config_day = routes["coding-agent-tools-60d"]["days"][9]
+        self.assertTrue(any("Hello-Agents GSSC" in day["title"] for day in agent_days))
+        codex_config_day = next(
+            day for day in routes["coding-agent-tools-60d"]["days"] if "Codex 配置层级" in day["title"]
+        )
         self.assertIn("config.toml", codex_config_day["core_knowledge"])
         self.assertIn("项目", codex_config_day["hands_on_task"])
 
@@ -224,7 +268,7 @@ class CuratedRoadmapTests(TestCase):
         self.assertEqual(migrated["schema_version"], 2)
         self.assertNotIn("runtime", migrated)
         self.assertEqual(migrated["course_baseline"]["python"], "3.12")
-        self.assertEqual(migrated["content_version"], 5)
+        self.assertEqual(migrated["content_version"], 6)
         self.assertEqual(migrated["roadmaps"][0]["summary"], "使用Python 3.12")
         with self.assertRaises(CatalogError):
             migrate_catalog({"schema_version": 99})

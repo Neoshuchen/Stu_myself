@@ -228,6 +228,10 @@ TERM_NOTES = {
         ("采集", "采集是“请求—校验响应—解析—清洗—去重—存储”的数据管道，每层都应保留可定位失败的证据。"),
         ("HTTP", "先看方法、URL、请求头和请求体，再看状态码、响应头和响应体；这些事实决定代码如何复现。"),
         ("Network", "Network 面板记录浏览器真实请求；Payload 看发送数据，Preview/Response 看返回结构，Initiator 看发起位置。"),
+        ("Headers", "Headers 展示所选请求的 HTTP 头；重点核对内容类型、认证、Cookie、缓存以及服务端返回的响应元数据。"),
+        ("Payload", "Payload 展示查询参数、表单数据或请求体；复现时要保持字段层级、编码方式和 Content-Type 一致。"),
+        ("Preview", "Preview 是浏览器对响应内容的格式化预览，Response 才是原始响应；解析前应同时核对状态码和真实响应体。"),
+        ("Initiator", "Initiator 显示请求的发起位置或调用栈，可用于从目标请求反向定位生成参数的脚本。"),
         ("requests", "requests 把 HTTP 请求映射为 Python API；生产代码必须设置 timeout 并检查状态码。"),
         ("Cookie", "Cookie 是客户端随匹配域名和路径自动回传的小段状态；Session 可在多次请求间持有它。"),
         ("超时", "连接超时限制建连等待，读取超时限制相邻数据等待；二者都不能替代整个任务预算。"),
@@ -332,10 +336,15 @@ FALLBACK_CONCEPT_NOTES = {
 
 
 def track_kind(track):
-    kind = SYSTEM_TRACKS.get(track, "")
-    if kind == "accelerated":
-        return "accelerated"
-    return kind
+    """把路线标识转换为教学类型。
+
+    Args:
+        track: 系统路线 slug 或综合路线学习日的基础分类。
+
+    Returns:
+        对应教学类型；未知分类返回空字符串。
+    """
+    return SYSTEM_TRACKS.get(track, track if track in SYSTEM_TRACKS.values() else "")
 
 
 def infer_accelerated_kind(text):
@@ -366,15 +375,24 @@ def concept_notes(kind, core):
     """把课程核心术语映射为经过编辑核对的概念解释。"""
     terms = [part.strip(" `") for part in re.split(r"[、，,/+]", core) if part.strip(" `")]
     notes = []
+    unmatched = []
     for term in terms:
         match = next((note for key, note in TERM_NOTES.get(kind, []) if keyword_matches(key, term)), None)
         # 生活课程只展示与当天主题直接匹配的编辑说明，避免用泛化套话冒充具体知识。
         if kind in LIFESTYLE_TRACKS and not match:
             continue
-        notes.append({
-            "term": term,
-            "explanation": match or FALLBACK_CONCEPT_NOTES[kind].format(term=term),
-        })
+        if match:
+            existing = next((item for item in notes if item["explanation"] == match), None)
+            if existing:
+                existing["term"] += f" / {term}"
+            else:
+                notes.append({"term": term, "explanation": match})
+        else:
+            unmatched.append(term)
+    # 多个未收录术语属于同一个当天主题，只给一次通用导读，避免逐词复制同一句模板。
+    if unmatched:
+        combined = "、".join(unmatched)
+        notes.append({"term": combined, "explanation": FALLBACK_CONCEPT_NOTES[kind].format(term=combined)})
     return notes or [{"term": core, "explanation": FALLBACK_CONCEPT_NOTES[kind].format(term=core)}]
 
 

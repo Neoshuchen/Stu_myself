@@ -466,6 +466,17 @@ def track_key(track, point, task):
 
 
 def contextual_detail(point, task, criteria, track=""):
+    """生成一个知识主题的讲解、练习、资料与验收详情。
+
+    Args:
+        point: 当天核心知识主题。
+        task: 学习者需要独立完成的任务。
+        criteria: 可观察的验收条件。
+        track: 系统路线 slug 或综合路线的日分类。
+
+    Returns:
+        可直接写入课程正文的知识详情字典。
+    """
     guide = TRACK_GUIDES[track_key(track, point, task)]
     kind = track_kind(track)
     if kind == "accelerated":
@@ -478,7 +489,7 @@ def contextual_detail(point, task, criteria, track=""):
     code = teaching_example["code"] if teaching_example else guide["code"].format(point=point, point_json=point_json)
     expected = list(criteria) or ["产物可由他人复现", "结论与证据能够相互对应"]
     if kind in LIFESTYLE_TRACKS:
-        summary = f"{teaching_note} 今日通过“{task}”把知识转化为可核对、可复盘的日常能力。"
+        summary = f"今天聚焦“{point}”，通过“{task}”形成可核对、可复盘的日常能力。"
         requirement = f"先独立完成“{task}”；使用脱敏记录、虚拟案例或低风险场景，保留常规情境、边界或失败情境、判断依据与复盘。"
         expected += ["边界或失败情境能稳定呈现且处理理由可解释", "练习表、判断证据、安全边界与复盘已保存"]
         mastery = [
@@ -494,7 +505,7 @@ def contextual_detail(point, task, criteria, track=""):
             "加入边界或失败情境，保存处理证据并按验收条件复盘",
         ]
     else:
-        summary = f"{teaching_note} 今日通过“{task}”把原理落实为可运行、可验证的能力。"
+        summary = f"今天聚焦“{point}”，通过“{task}”把原理落实为可运行、可验证的能力。"
         requirement = f"先独立完成“{task}”；至少保留一个正常输入、一个边界或失败输入、实际运行命令、环境版本和关键输出。参考代码只作为实验骨架，必须替换成当天真实实现。"
         expected += ["失败样例能稳定触发且原因可解释", "运行命令、环境版本与关键输出已保存"]
         mastery = [f"闭卷说明{point}的输入、输出、依赖状态和不适用边界", "不看参考实现完成正常与失败两条路径", "能用断言、调用栈、日志或测试向量证明结论", "能把失败收敛为下一步可执行的问题"]
@@ -502,7 +513,7 @@ def contextual_detail(point, task, criteria, track=""):
     item = detail(
         point,
         summary,
-        f"{teaching_note} 本日把这个原理用于“{task}”。",
+        teaching_note,
         guide["mechanism"],
         guide["tools"],
         guide["pitfalls"],
@@ -516,16 +527,28 @@ def contextual_detail(point, task, criteria, track=""):
         practice_steps,
     )
     item["code_explanation"] = teaching_example["explanation"] if teaching_example else ["先辨认示例输入与预期输出。", "替换成当天任务数据，并增加失败输入验证边界。"]
-    item["what_it_solves"] = teaching_note
+    item["what_it_solves"] = f"帮助你判断“{point}”何时适用，并让当天任务有明确的输入、边界和验收依据。"
     return item
 
 
 def build_lesson_content(day_number, core_knowledge, task, criteria, track=""):
+    """根据学习日定义生成完整课程正文。
+
+    Args:
+        day_number: 路线内从 1 开始的学习日编号。
+        core_knowledge: 当天核心知识。
+        task: 当天独立任务。
+        criteria: 当天验收条件。
+        track: 系统路线 slug 或综合路线的日分类。
+
+    Returns:
+        包含知识详情、教学流程和验证方式的版本化字典。
+    """
     # 每日正文保持为一个连贯主题；逗号分隔的术语仍由概念图逐项解释，避免拆成互不关联的知识卡。
     points = split_knowledge_points(core_knowledge) if not track_kind(track) else [core_knowledge.strip(" `")]
     details = [contextual_detail(point, task, criteria, track) for point in points]
     for item in details:
-        item["role"] = f"在本日综合任务中，它直接服务于：{task}"
+        item["role"] = f"先用本知识点完成关键判断，再把结果用于验收当天的独立任务。"
         guide = TRACK_GUIDES[track_key(track, item["name"], task)]
         if not item.get("resources"):
             item["resources"] = list(guide["resources"])
@@ -548,7 +571,8 @@ def build_lesson_content(day_number, core_knowledge, task, criteria, track=""):
         ]
     }
     return {
-        "version": 5,
+        "version": 6,
+        "track": track,
         "knowledge_details": details,
         **teaching,
     }

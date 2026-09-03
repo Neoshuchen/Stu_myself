@@ -1,5 +1,6 @@
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.db.models import Q
 
 from learning.models import LearningPlan, PlanDay
 from learning.study.roadmap_catalog import SYSTEM_ROADMAPS
@@ -62,6 +63,17 @@ class Command(BaseCommand):
                     day_number=item["day_number"],
                     defaults=values,
                 )
-            plan.days.exclude(day_number__in=[item["day_number"] for item in days]).delete()
+            obsolete_days = plan.days.exclude(day_number__in=[item["day_number"] for item in days])
+            # 缩短系统路线时不得级联删除学习进度、社区讨论或课程改进记录。
+            protected_days = obsolete_days.filter(
+                Q(content_edited_at__isnull=False)
+                | Q(progress__isnull=False)
+                | Q(community_posts__isnull=False)
+                | Q(course_suggestions__isnull=False)
+            ).distinct()
+            if protected_days.exists():
+                numbers = ", ".join(map(str, protected_days.values_list("day_number", flat=True)[:10]))
+                raise CommandError(f"{plan.slug} 待删除的 Day {numbers} 已有用户数据，请先迁移这些记录。")
+            obsolete_days.delete()
             skipped = f"，跳过 {len(edited)} 天已手工编辑的正文（--force 可覆盖）" if edited else ""
             self.stdout.write(self.style.SUCCESS(f"{plan.title}：已导入 {len(days) - len(edited)} 天{skipped}"))
