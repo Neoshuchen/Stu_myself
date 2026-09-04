@@ -45,7 +45,7 @@ def migrate_catalog(catalog):
         catalog["schema_version"] = 2
         catalog.pop("runtime", None)
         catalog["course_baseline"] = {"python": "3.12"}
-        catalog.setdefault("content_version", 7)
+        catalog.setdefault("content_version", 8)
         version = 2
     if version != CURRENT_SCHEMA_VERSION:
         raise CatalogError(f"不支持课程目录版本 {version}，当前版本为 {CURRENT_SCHEMA_VERSION}。")

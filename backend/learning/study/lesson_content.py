@@ -214,7 +214,7 @@ if __name__ == "__main__":
         "summary": "在本地或明确授权的靶场中，用请求快照、解析结果和失败记录还原完整采集链路。",
         "basic": "一个可维护的采集任务至少包含请求、响应校验、解析、去重、持久化和失败恢复。学习知识点时要指出它位于哪一层、消费什么数据、向下一层交付什么结构。",
         "mechanism": "先在 Network 或本地服务中固定请求样本，再离线解析保存的响应；请求阶段设置超时和频率，解析阶段处理缺字段，写入阶段保证幂等。这样网络变化与解析错误可以分别定位。",
-        "tools": ["Chrome Network", "requests", "Scrapy", "本地 HTTP 靶场"],
+        "tools": ["Chrome DevTools Network", "requests", "Scrapy", "本地 HTTP 靶场"],
         "pitfalls": ["没有授权、频率和退出机制", "边请求边调解析导致样本不可复现", "忽略状态码、编码、分页终止与重复写入"],
         "language": "python",
         "command": "python practice.py",
@@ -340,7 +340,7 @@ register read
 }
 
 
-# 生活课程按主题选择一手资料，避免把“权威但无关”的链接机械轮换到每一天。
+# 按主题选择一手资料，避免把“权威但无关”的链接机械轮换到每一天。
 VERIFIED_RESOURCES = {
     "cfpb_toolkit": {"title": "CFPB 个人财务工具包", "url": "https://www.consumerfinance.gov/consumer-tools/educator-tools/your-money-your-goals/toolkit/"},
     "cfpb_debt": {"title": "CFPB 债务行动计划", "url": "https://files.consumerfinance.gov/f/documents/cfpb_your-money-your-goals_debt-action-plan_tool_2018-11.pdf"},
@@ -399,6 +399,39 @@ VERIFIED_RESOURCES = {
     "owasp_agentic": {"title": "OWASP Agentic 应用安全指南", "url": "https://genai.owasp.org/resource/securing-agentic-applications-guide-1-0/"},
     "git_docs": {"title": "Git 官方文档", "url": "https://git-scm.com/docs"},
     "owasp_injection": {"title": "OWASP 提示注入风险", "url": "https://genai.owasp.org/llmrisk/llm01-prompt-injection/"},
+    "python_tutorial": {"title": "Python 3.12 官方教程", "url": "https://docs.python.org/zh-cn/3.12/tutorial/"},
+    "python_library": {"title": "Python 3.12 标准库", "url": "https://docs.python.org/zh-cn/3.12/library/"},
+    "python_asyncio": {"title": "Python asyncio 官方文档", "url": "https://docs.python.org/zh-cn/3.12/library/asyncio.html"},
+    "python_sqlite": {"title": "Python sqlite3 官方文档", "url": "https://docs.python.org/zh-cn/3.12/library/sqlite3.html"},
+    "python_unittest": {"title": "Python unittest 官方文档", "url": "https://docs.python.org/zh-cn/3.12/library/unittest.html"},
+    "mdn_http": {"title": "MDN HTTP 指南", "url": "https://developer.mozilla.org/zh-CN/docs/Web/HTTP"},
+    "requests_quickstart": {"title": "Requests 官方快速入门", "url": "https://requests.readthedocs.io/en/latest/user/quickstart/"},
+    "beautifulsoup_docs": {"title": "Beautiful Soup 官方文档", "url": "https://www.crummy.com/software/BeautifulSoup/bs4/doc/"},
+    "playwright_locators": {"title": "Playwright Locator 官方文档", "url": "https://playwright.dev/python/docs/locators"},
+    "scrapy_architecture": {"title": "Scrapy 架构官方文档", "url": "https://docs.scrapy.org/en/latest/topics/architecture.html"},
+    "scrapy_retry": {"title": "Scrapy 下载中间件官方文档", "url": "https://docs.scrapy.org/en/latest/topics/downloader-middleware.html"},
+    "robots_rfc": {"title": "Robots Exclusion Protocol RFC 9309", "url": "https://www.rfc-editor.org/rfc/rfc9309"},
+    "mdn_javascript": {"title": "MDN JavaScript 指南", "url": "https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Guide"},
+    "mdn_async": {"title": "MDN 异步 JavaScript", "url": "https://developer.mozilla.org/zh-CN/docs/Learn_web_development/Extensions/Async_JS"},
+    "mdn_webcrypto": {"title": "MDN Web Crypto API", "url": "https://developer.mozilla.org/zh-CN/docs/Web/API/Web_Crypto_API"},
+    "chrome_network": {"title": "Chrome DevTools Network 官方指南", "url": "https://developer.chrome.com/docs/devtools/network/"},
+    "chrome_breakpoints": {"title": "Chrome DevTools 断点官方指南", "url": "https://developer.chrome.com/docs/devtools/javascript/breakpoints"},
+    "babel_parser": {"title": "Babel Parser 官方文档", "url": "https://babeljs.io/docs/babel-parser"},
+    "babel_traverse": {"title": "Babel Traverse 官方文档", "url": "https://babeljs.io/docs/babel-traverse"},
+    "android_fundamentals": {"title": "Android 应用基础", "url": "https://developer.android.com/guide/components/fundamentals"},
+    "android_adb": {"title": "Android Debug Bridge 官方文档", "url": "https://developer.android.com/tools/adb"},
+    "android_security_config": {"title": "Android 网络安全配置", "url": "https://developer.android.com/privacy-and-security/security-config"},
+    "android_jni": {"title": "Android JNI 官方指南", "url": "https://developer.android.com/ndk/guides/jni-tips"},
+    "jadx_docs": {"title": "JADX 官方项目文档", "url": "https://github.com/skylot/jadx"},
+    "apktool_docs": {"title": "Apktool 官方文档", "url": "https://apktool.org/docs/intro"},
+    "frida_js": {"title": "Frida JavaScript API", "url": "https://frida.re/docs/javascript-api/"},
+    "apple_signing": {"title": "Apple Code Signing Services", "url": "https://developer.apple.com/documentation/security/code-signing-services"},
+    "apple_keychain": {"title": "Apple Keychain Services", "url": "https://developer.apple.com/documentation/security/keychain-services"},
+    "apple_ats": {"title": "Apple 安全网络连接指南", "url": "https://developer.apple.com/documentation/security/preventing-insecure-network-connections"},
+    "apple_objc_runtime": {"title": "Objective-C Runtime", "url": "https://developer.apple.com/documentation/objectivec/objective-c_runtime"},
+    "apple_macho": {"title": "Apple Mach-O 概览", "url": "https://developer.apple.com/library/archive/documentation/Performance/Conceptual/CodeFootprint/Articles/MachOOverview.html"},
+    "lldb_tutorial": {"title": "LLDB 官方教程", "url": "https://lldb.llvm.org/use/tutorial.html"},
+    "frida_ios": {"title": "Frida iOS 官方示例", "url": "https://frida.re/docs/examples/ios/"},
 }
 
 RESOURCE_GROUPS = {
@@ -453,6 +486,59 @@ RESOURCE_GROUPS = {
         (("安全", "提示注入", "最小权限", "人工审批"), ("owasp_agentic", "mcp_latest", "hello_agents")),
         ((), ("hello_agents", "mcp_latest", "a2a_latest")),
     ],
+    "python": [
+        (("asyncio", "协程", "Task", "并发", "取消"), ("python_asyncio", "python_library", "python_unittest")),
+        (("SQLite", "sqlite3", "SQL", "数据库"), ("python_sqlite", "python_library", "python_unittest")),
+        (("测试", "pytest", "unittest", "断言"), ("python_unittest", "python_tutorial", "python_library")),
+        (("HTTP", "JSON", "Socket", "网络"), ("python_library", "mdn_http", "python_unittest")),
+        ((), ("python_tutorial", "python_library", "python_unittest")),
+    ],
+    "crawler": [
+        (("Scrapy", "Spider", "Pipeline", "Scheduler", "Middleware"), ("scrapy_architecture", "scrapy_retry", "robots_rfc")),
+        (("Playwright", "动态", "渲染", "locator"), ("playwright_locators", "chrome_network", "robots_rfc")),
+        (("Network", "Headers", "Payload", "Preview", "Initiator"), ("chrome_network", "mdn_http", "requests_quickstart")),
+        (("解析", "CSS", "XPath", "BeautifulSoup", "lxml"), ("beautifulsoup_docs", "requests_quickstart", "robots_rfc")),
+        (("HTTP", "requests", "请求", "响应", "Cookie", "Session"), ("requests_quickstart", "mdn_http", "robots_rfc")),
+        ((), ("mdn_http", "requests_quickstart", "robots_rfc")),
+    ],
+    "javascript": [
+        (("AST", "Babel", "混淆", "还原"), ("babel_parser", "babel_traverse", "mdn_javascript")),
+        (("Network", "断点", "调用栈", "Hook", "DevTools"), ("chrome_network", "chrome_breakpoints", "mdn_javascript")),
+        (("crypto", "加密", "随机", "字节", "编码"), ("mdn_webcrypto", "mdn_javascript", "chrome_breakpoints")),
+        (("Promise", "async", "事件循环", "微任务"), ("mdn_async", "mdn_javascript", "chrome_breakpoints")),
+        ((), ("mdn_javascript", "chrome_breakpoints", "babel_parser")),
+    ],
+    "android": [
+        (("JNI", "Native", "ELF", "ARM64", "so"), ("android_jni", "frida_js", "android_fundamentals")),
+        (("Frida", "Hook", "Java.perform", "Java.use", "ClassLoader"), ("frida_js", "jadx_docs", "android_fundamentals")),
+        (("网络", "证书", "TLS", "OkHttp", "代理"), ("android_security_config", "android_fundamentals", "frida_js")),
+        (("JADX", "DEX", "Smali", "Apktool", "静态"), ("jadx_docs", "apktool_docs", "android_fundamentals")),
+        (("ADB", "设备", "日志", "模拟器"), ("android_adb", "android_fundamentals", "jadx_docs")),
+        ((), ("android_fundamentals", "android_adb", "frida_js")),
+    ],
+    "ios": [
+        (("Keychain", "存储", "沙箱"), ("apple_keychain", "apple_signing", "frida_ios")),
+        (("网络", "证书", "ATS", "URLSession"), ("apple_ats", "lldb_tutorial", "frida_ios")),
+        (("Frida", "Hook", "ObjC", "Swift"), ("frida_ios", "frida_js", "apple_objc_runtime")),
+        (("LLDB", "断点", "寄存器", "内存"), ("lldb_tutorial", "apple_macho", "apple_objc_runtime")),
+        (("Mach-O", "IPA", "dyld", "ASLR", "砸壳"), ("apple_macho", "apple_signing", "lldb_tutorial")),
+        (("签名", "Entitlement", "Provisioning"), ("apple_signing", "apple_macho", "lldb_tutorial")),
+        ((), ("apple_signing", "lldb_tutorial", "frida_ios")),
+    ],
+}
+
+
+TOPIC_TOOLS = {
+    "python": [(('SQLite', 'SQL'), ('sqlite3', '参数化 SQL')), (('asyncio', '协程', '并发'), ('asyncio', '超时与取消测试')), (('HTTP', 'JSON', '网络'), ('本地 HTTP 测试服务', 'urllib.request'))],
+    "crawler": [(('Scrapy', 'Spider', 'Pipeline'), ('Scrapy', 'Stats 与日志')), (('Playwright', '动态'), ('Playwright', 'Trace Viewer')), (('Network', 'Headers', 'Payload', 'Preview'), ('Chrome DevTools Network', '固定请求快照')), (('解析', 'CSS', 'XPath'), ('Beautiful Soup/lxml', '固定 HTML 夹具')), (('HTTP', 'requests', '请求'), ('Requests', '本地 mock server'))],
+    "javascript": [(('AST', 'Babel'), ('Babel parser/traverse/generator', 'Node.js')), (('Network', '断点', '调用栈'), ('Chrome DevTools', '固定请求样本')), (('crypto', '编码', '字节'), ('Web Crypto API', '十六进制测试向量'))],
+    "android": [(('Frida', 'Hook', 'Java.perform'), ('Frida', '专用模拟器')), (('JADX', 'DEX', 'Smali', 'Apktool'), ('JADX/Apktool', '授权 APK')), (('JNI', 'Native', 'ELF', 'ARM64'), ('Ghidra', 'Frida Interceptor')), (('ADB', '日志', '设备'), ('ADB', '专用模拟器'))],
+    "ios": [(('LLDB', '断点', '内存'), ('LLDB', '授权测试 App')), (('Frida', 'Hook'), ('Frida', '授权测试设备')), (('Mach-O', 'IPA', 'dyld'), ('otool/codesign', 'Hopper/Ghidra')), (('签名', 'Entitlement'), ('Xcode/codesign', 'Provisioning Profile'))],
+    "agent": [(('MCP',), ('MCP Inspector', '本地只读 Server')), (('RAG', '检索', '记忆'), ('SQLite', '固定文档夹具')), (('评估', 'Trace', '回放'), ('结构化 Trace', '确定性评估集'))],
+    "finance": [(('预算', '现金流', '债务', '复利', '费用'), ('脱敏电子表格', '计算器')), (('保险', '合同'), ('合同原文', '监管机构官网'))],
+    "health": [(('睡眠',), ('睡眠日记', '固定记录表')), (('活动', '运动', '久坐'), ('活动记录表', '稳定支撑环境')), (('急救', '应急', 'CPR', '止血'), ('离线情景卡', '合格急救培训'))],
+    "communication": [(('倾听', '反馈', '冲突', '谈判'), ('低风险角色演练', '复述记录')), (('写作', '邮件', '表达'), ('书面草稿', '受众复述测试'))],
+    "digital_literacy": [(('口令', '密码', 'MFA'), ('测试账户', '密码管理器')), (('备份', '恢复'), ('隔离测试文件', '恢复校验表')), (('信息', '证据', 'AI', '图片', '视频'), ('浏览器横向查证', '来源核验表'))],
 }
 
 
@@ -477,6 +563,61 @@ def relevant_resources(kind, point, fallback):
         if item["url"] not in {resource["url"] for resource in resources}:
             resources.append(dict(item))
     return resources[:3]
+
+
+def relevant_tools(kind, point, defaults):
+    """返回与当天主题直接相关、且不重复的工具或练习材料。"""
+    tools = []
+    for keywords, names in TOPIC_TOOLS.get(kind, []):
+        if any(keyword.casefold() in point.casefold() for keyword in keywords):
+            tools.extend(names)
+    tools.extend(defaults)
+    return list(dict.fromkeys(tools))[:4]
+
+
+def daily_mechanism(point, task, criteria, guide, teaching_example):
+    """用当天示例与验收项解释知识如何在任务中产生结果。"""
+    evidence = criteria[0] if criteria else "产物可由他人复现"
+    if teaching_example:
+        example_flow = " ".join(teaching_example["explanation"])
+    else:
+        example_flow = guide["mechanism"]
+    return f"{example_flow} 在“{task}”中，把“{point}”落实到可观察的输入、状态变化和输出，并以“{evidence}”作为成功证据。"
+
+
+def daily_pitfalls(kind, point, task, criteria, guide):
+    """返回与当天任务和验收条件绑定的常见失败方式。"""
+    evidence = criteria[0] if criteria else "产物可由他人复现"
+    if kind in LIFESTYLE_TRACKS:
+        return [
+            f"只记住“{point}”的名称，未区分可核对事实、个人判断和下一步行动",
+            f"完成“{task}”时使用真实敏感数据，或在资料不足时把猜测写成结论",
+            f"只声称完成练习，没有保存能证明“{evidence}”的记录或来源",
+        ]
+    return [
+        f"只背“{point}”的术语，不能解释它在当天任务中的输入、状态和输出",
+        f"只运行参考骨架或成功路径，没有独立完成“{task}”并验证失败输入",
+        f"以没有报错代替验收，没有保存能证明“{evidence}”的输出、断言或调用证据",
+        guide["pitfalls"][0],
+    ]
+
+
+def daily_practice_steps(kind, point, task, criteria, run_command):
+    """把课程的固定学习节奏具体化为当天可执行步骤。"""
+    checks = "；".join(criteria[:2]) if criteria else "结果可复现"
+    if kind in LIFESTYLE_TRACKS:
+        return [
+            f"用自己的话说明“{point}”适用的情境、判断依据和停止条件",
+            f"使用脱敏记录或离线案例，按“{run_command}”完成一次引导练习",
+            f"关闭参考模板，独立完成“{task}”，并把事实、判断和行动分开记录",
+            f"加入一个边界或失败情境，保存证据并逐项核对：{checks}",
+        ]
+    return [
+        f"画出“{point}”在当天任务中的输入、处理、状态和输出",
+        f"运行“{run_command}”，逐段核对参考骨架实际改变了什么",
+        f"关闭参考答案，独立完成“{task}”，不复制示例中的占位实现",
+        f"加入边界或失败输入，保存命令与输出并逐项核对：{checks}",
+    ]
 
 
 def track_key(track, point, task):
@@ -534,7 +675,8 @@ def contextual_detail(point, task, criteria, track=""):
         kind = infer_accelerated_kind(f"{point} {task}")
     teaching_example = example_for(kind, point) if kind else None
     concepts = concept_notes(kind, point) if kind else []
-    teaching_note = " ".join(item["explanation"] for item in concepts[:2]) if concepts else guide["basic"]
+    # 所有经审核的概念都进入正文，不能因合并日主题较多而静默丢掉第三项后的解释。
+    teaching_note = " ".join(item["explanation"] for item in concepts) if concepts else guide["basic"]
     resources = relevant_resources(kind, point, guide["resources"])
     point_json = repr(point).replace("'", '"')
     code = teaching_example["code"] if teaching_example else guide["code"].format(point=point, point_json=point_json)
@@ -549,36 +691,31 @@ def contextual_detail(point, task, criteria, track=""):
             "能用脱敏记录、计算、来源或观察证据支持结论",
             "能识别停止条件，并把复盘转成下一步行动",
         ]
-        practice_steps = [
-            "阅读前置要求和安全边界，写下今天允许使用的数据或场景",
-            "按参考模板完成一次引导练习，并区分事实、判断和行动",
-            "关闭参考内容，独立完成常规情境",
-            "加入边界或失败情境，保存处理证据并按验收条件复盘",
-        ]
     else:
         summary = f"今天聚焦“{point}”，通过“{task}”把原理落实为可运行、可验证的能力。"
         requirement = f"先独立完成“{task}”；至少保留一个正常输入、一个边界或失败输入、实际运行命令、环境版本和关键输出。参考代码只作为实验骨架，必须替换成当天真实实现。"
         expected += ["失败样例能稳定触发且原因可解释", "运行命令、环境版本与关键输出已保存"]
         mastery = [f"闭卷说明{point}的输入、输出、依赖状态和不适用边界", "不看参考实现完成正常与失败两条路径", "能用断言、调用栈、日志或测试向量证明结论", "能把失败收敛为下一步可执行的问题"]
-        practice_steps = ["阅读前置要求与概念图，写出当天输入、处理和输出", "逐段运行参考骨架并解释每一步状态变化", "关闭参考答案，独立完成正常路径", "加入失败或边界输入，保存命令、输出并按验收条件复盘"]
+    run_command = teaching_example["command"] if teaching_example else guide["command"]
+    practice_steps = daily_practice_steps(kind, point, task, expected, run_command)
     item = detail(
         point,
         summary,
         teaching_note,
-        guide["mechanism"],
-        guide["tools"],
-        guide["pitfalls"],
+        daily_mechanism(point, task, expected, guide, teaching_example),
+        relevant_tools(kind, point, guide["tools"]),
+        daily_pitfalls(kind, point, task, expected, guide),
         requirement,
         code,
         teaching_example["language"] if teaching_example else guide["language"],
-        teaching_example["command"] if teaching_example else guide["command"],
+        run_command,
         expected,
         mastery,
         resources,
         practice_steps,
     )
     item["code_explanation"] = teaching_example["explanation"] if teaching_example else ["先辨认示例输入与预期输出。", "替换成当天任务数据，并增加失败输入验证边界。"]
-    item["what_it_solves"] = f"帮助你判断“{point}”何时适用，并让当天任务有明确的输入、边界和验收依据。"
+    item["what_it_solves"] = f"帮助你在“{task}”中正确使用“{point}”，并用“{expected[0]}”判断结果是否成立。"
     return item
 
 
@@ -599,7 +736,7 @@ def build_lesson_content(day_number, core_knowledge, task, criteria, track=""):
     points = split_knowledge_points(core_knowledge) if not track_kind(track) else [core_knowledge.strip(" `")]
     details = [contextual_detail(point, task, criteria, track) for point in points]
     for item in details:
-        item["role"] = f"先用本知识点完成关键判断，再把结果用于验收当天的独立任务。"
+        item["role"] = f"先用“{item['name']}”识别当天任务的关键输入和边界，再用“{criteria[0] if criteria else '可复现结果'}”完成验收。"
         guide = TRACK_GUIDES[track_key(track, item["name"], task)]
         if not item.get("resources"):
             item["resources"] = list(guide["resources"])
@@ -622,7 +759,7 @@ def build_lesson_content(day_number, core_knowledge, task, criteria, track=""):
         ]
     }
     return {
-        "version": 7,
+        "version": 8,
         "track": track,
         "knowledge_details": details,
         **teaching,

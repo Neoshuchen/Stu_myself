@@ -137,7 +137,7 @@ TERM_NOTES = {
         ("Gemini 沙箱", "Gemini CLI 可使用沙箱隔离有副作用的工具；沙箱、可信目录和审批分别控制执行环境、上下文信任与动作授权，三者不能互相替代。"),
         ("Copilot CLI", "GitHub Copilot CLI 可通过 npm、WinGet 或 Homebrew 安装，首次运行 `copilot` 后用 `/login` 认证；组织账号还需确认管理员策略是否允许 CLI。"),
         ("Aider", "Aider 官方优先推荐隔离安装方式，例如 aider-install、uv tool 或 pipx；进入 Git 仓库后再选择模型和 Provider，并先核对版本与仓库状态。"),
-        ("Cline", "Cline 可作为 IDE 扩展或 CLI 使用；当前 CLI 仍是 macOS/Linux 预览版且需要 Node.js 20+，原生 Windows 应使用 IDE 扩展，或在 WSL/Linux 中运行 `cline auth`。"),
+        ("Cline", "Cline 可作为 IDE 扩展或 CLI 使用；CLI 需要 Node.js 20+（官方推荐 22），通过 `npm install -g cline` 安装并用 `cline auth` 认证。应根据 IDE 内交互或终端自动化需求选择入口。"),
         ("goose", "goose 提供桌面端与 CLI，并通过 Provider、MCP 扩展和 ACP 连接能力；Windows 安装要按当前官方前置条件核对 Shell、PATH 与凭据存储。"),
         ("安装来源", "安装前只从产品官网、官方包仓库或官方发布页取得命令；管道执行远程脚本前先下载、检查来源和内容，并保存版本与卸载路径。"),
         ("版本核对", "安装完成后同时记录命令路径、版本、运行时和更新渠道；排障先确认当前调用的不是旧 PATH、别名或另一个环境中的同名程序。"),
@@ -440,9 +440,9 @@ AGENT_TOOL_EXAMPLES = [
     ]), ["aider-install 会把 Aider 放入隔离环境，避免污染项目依赖。", "Aider 与 Git 深度集成，开始前和每轮修改后都要核对提交与 diff。"]),
     (("Cline",), code([
         "code --list-extensions",
-        "# 原生 Windows：从官方 IDE 扩展市场安装 Cline。",
-        "# macOS/Linux/WSL 预览 CLI：npm install -g cline，再运行 cline auth 和 cline version。",
-    ]), ["当前原生 Windows 使用 IDE 扩展；CLI 实验放在官方支持的 macOS/Linux 或 WSL 环境。", "Provider、Rules、自动批准和工作区范围应分别检查。"]),
+        "# IDE 路径：从官方扩展市场安装 Cline。",
+        "# CLI 路径：先确认 Node.js 20+（推荐 22），再运行 npm install -g cline 和 cline auth。",
+    ]), ["官方同时提供 IDE 扩展与 CLI；按交互位置选择，不把平台限制写成不存在的前提。", "Provider、Rules、自动批准和工作区范围应分别检查。"]),
     (("goose",), code([
         "goose --version", "goose configure", "# Windows 先按当前官方文档选择桌面端或满足前置条件的 CLI 安装。",
         "# 只启用完成练习所需的 Provider 和扩展，再运行只读项目说明任务。",
@@ -624,7 +624,7 @@ PYTHON_EXAMPLES = [
 
 
 CRAWLER_EXAMPLES = [
-    (("HTTP", "请求", "响应"), code([
+    (("HTTP", "请求", "响应", "Network", "Headers", "Payload", "Preview"), code([
         "from dataclasses import dataclass", "", "@dataclass(frozen=True)", "class Snapshot:",
         "    method: str", "    url: str", "    status: int", "    content_type: str", "",
         "item = Snapshot('GET', 'http://127.0.0.1:8000/items', 200, 'application/json')",
@@ -970,17 +970,17 @@ def build_teaching_sections(day_number, core, task, criteria, kind):
             "verification": {
                 "checks": list(criteria) + ["常规与边界或失败情境均已保存", "能闭卷解释判断依据、适用范围和停止条件"],
                 "evidence": [
-                    "填写完整的脱敏练习表或角色演练记录",
-                    "关键事实、计算、来源或观察证据",
-                    "边界或失败样例及其安全处理",
+                    f"“{task}”的脱敏练习表或角色演练记录",
+                    f"支持“{criteria[0] if criteria else '结论可复核'}”的计算、来源或观察证据",
+                    f"“{core}”的边界或失败样例及其安全处理",
                     "100 字以上复盘与一个下一步行动",
                 ],
             },
             "workflow": [
-                {"title": "先建立边界", "body": "阅读前置要求和安全边界，写下今天可以练什么、遇到什么情况必须停止或求助。"},
-                {"title": "跟做并核对", "body": "使用脱敏记录、虚拟案例或低风险场景填写模板，逐项区分事实、判断和行动。"},
+                {"title": "先建立边界", "body": f"围绕“{core}”写下允许使用的数据、适用条件，以及必须停止或求助的情形。"},
+                {"title": "跟做并核对", "body": f"用脱敏记录或低风险场景完成一次“{task}”的引导练习，逐项区分事实、判断和行动。"},
                 {"title": "关闭答案独立完成", "body": f"不复制参考内容，独立完成“{task}”；资料不足时明确写出未知项。"},
-                {"title": "用边界证明掌握", "body": "加入一个失败或边界情境，保存处理证据，并按验收条件复盘下一步。"},
+                {"title": "用边界证明掌握", "body": f"加入失败或边界情境，保存处理证据，并核对“{criteria[0] if criteria else '结果可复核'}”。"},
             ],
         }
     return {
@@ -1000,12 +1000,12 @@ def build_teaching_sections(day_number, core, task, criteria, kind):
         },
         "verification": {
             "checks": list(criteria) + ["正常、边界、失败三类结果均已保存", "能闭卷解释关键数据流和失败原因"],
-            "evidence": ["源代码或实验脚本", "实际运行命令与环境版本", "关键输出、日志、断言或调用栈", "100 字以上复盘与一个待解决问题"],
+            "evidence": [f"“{task}”的源代码或实验脚本", "实际运行命令与环境版本", f"证明“{criteria[0] if criteria else '结果可复现'}”的输出、日志、断言或调用栈", "100 字以上复盘与一个待解决问题"],
         },
         "workflow": [
-            {"title": "先建立上下文", "body": "阅读前置要求与今日目标，先写下输入会经过哪些步骤、最终应得到什么结果。"},
-            {"title": "跟做并理解示例", "body": "逐段运行知识卡中的参考示例；每运行一段，就对照代码讲解写下数据或状态的变化。"},
+            {"title": "先建立上下文", "body": f"围绕“{core}”写下输入、关键状态、预期输出和一个失败边界。"},
+            {"title": "跟做并理解示例", "body": f"逐段运行“{core}”的参考示例，并记录每段代码造成的数据或状态变化。"},
             {"title": "关闭答案独立完成", "body": f"不复制参考代码，独立完成“{task}”。卡住时只回看对应概念，不整段照抄。"},
-            {"title": "用失败证明掌握", "body": "加入边界和非法输入，运行验证清单并保存输出；最后闭卷解释结果为什么成立。"},
+            {"title": "用失败证明掌握", "body": f"加入边界和非法输入，保存输出并核对“{criteria[0] if criteria else '结果可复现'}”；最后闭卷解释原因。"},
         ],
     }

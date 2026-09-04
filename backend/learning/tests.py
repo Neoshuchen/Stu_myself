@@ -96,7 +96,7 @@ class LessonContentTests(TestCase):
             "OpenCode、/init、AGENTS.md": "opencode --version",
             "Claude Code、Agent Skills、子代理": "claude --version",
             "Aider、Repo Map、Provider": "aider-install",
-            "Cline、CLI、Provider": "原生 Windows：从官方 IDE 扩展市场安装 Cline",
+            "Cline、CLI、Provider": "npm install -g cline",
             "goose、Provider、ACP": "goose --version",
             "Copilot CLI、WinGet、/login": "copilot version",
         }
@@ -158,7 +158,7 @@ class CuratedRoadmapTests(TestCase):
         for plan in SYSTEM_ROADMAPS:
             for day in plan["days"]:
                 content = day["content"]
-                self.assertEqual(content["version"], 7)
+                self.assertEqual(content["version"], 8)
                 self.assertEqual(len(content["knowledge_details"]), 1)
                 self.assertTrue(content["prerequisites"])
                 self.assertEqual(len(content["learning_objectives"]), 3)
@@ -178,6 +178,23 @@ class CuratedRoadmapTests(TestCase):
                     self.assertGreaterEqual(len(item["code_explanation"]), 2)
                     self.assertTrue(item["what_it_solves"])
                     self.assertNotIn("围绕当天任务建立可解释、可复现", item["summary"])
+                    if plan["slug"] != "git-mastery-7d":
+                        self.assertIn(day["hands_on_task"], item["mechanism"])
+                        self.assertIn(day["acceptance_criteria"][0], item["pitfalls"][2])
+
+    def test_daily_guidance_is_not_reused_as_a_route_wide_template(self):
+        for plan in SYSTEM_ROADMAPS:
+            if plan["slug"] == "git-mastery-7d":
+                continue
+            details = [day["content"]["knowledge_details"][0] for day in plan["days"]]
+            for field in ("mechanism", "pitfalls", "practice_steps"):
+                values = [json.dumps(item[field], ensure_ascii=False, sort_keys=True) for item in details]
+                self.assertEqual(len(values), len(set(values)), f"{plan['slug']} 的 {field} 仍在跨日复用")
+            resource_sets = {
+                tuple(resource["url"] for resource in item["resources"])
+                for item in details
+            }
+            self.assertGreaterEqual(len(resource_sets), 2, f"{plan['slug']} 没有按主题选择资料")
 
     def test_import_is_idempotent_and_builds_visible_details(self):
         call_command("import_curated_roadmaps", verbosity=0)
@@ -189,7 +206,7 @@ class CuratedRoadmapTests(TestCase):
         self.assertTrue(plan.is_published)
         self.assertEqual(plan.review_status, LearningPlan.ReviewStatus.APPROVED)
         first_detail = plan.days.get(day_number=1).knowledge_details()[0]
-        self.assertEqual(plan.days.get(day_number=1).content["version"], 7)
+        self.assertEqual(plan.days.get(day_number=1).content["version"], 8)
         self.assertEqual(first_detail["run_command"], "python practice.py")
         self.assertTrue(first_detail["resources"])
         tools_plan = LearningPlan.objects.get(slug="coding-agent-tools-60d")
@@ -238,6 +255,8 @@ class CuratedRoadmapTests(TestCase):
         self.assertNotIn("yuque.com", serialized.casefold())
         for broken_term in ("、I、O", "I、O", "与、model", "与、login", "Thought-Action-Observation"):
             self.assertNotIn(broken_term, serialized)
+        for stale_content in ("未来24周", "第10周一个网络/数据假设", "当前 CLI 仍是 macOS/Linux"):
+            self.assertNotIn(stale_content, serialized)
         self.assertIn("Python 3.12", serialized)
         self.assertNotIn("Python 3.10", serialized)
         accelerated = next(plan for plan in SYSTEM_ROADMAPS if plan["slug"] == "web-reverse-android-accelerated")
@@ -294,12 +313,17 @@ class CuratedRoadmapTests(TestCase):
         )
         self.assertIn("config.toml", codex_config_day["core_knowledge"])
         self.assertIn("项目", codex_config_day["hands_on_task"])
-        cline_day = next(day for day in routes["coding-agent-tools-60d"]["days"] if "Cline 安装" in day["title"])
+        cline_day = next(
+            day for day in routes["coding-agent-tools-60d"]["days"]
+            if "Cline" in day["title"] and "安装" in day["title"]
+        )
         cline_detail = cline_day["content"]["knowledge_details"][0]
-        self.assertIn("原生 Windows", cline_day["hands_on_task"])
+        self.assertIn("IDE扩展或CLI", cline_day["hands_on_task"])
+        self.assertIn("Node.js 20+", cline_day["core_knowledge"])
         self.assertTrue(any("docs.cline.bot" in item["url"] for item in cline_detail["resources"]))
         copilot_day = next(
-            day for day in routes["coding-agent-tools-60d"]["days"] if "Copilot 交互" in day["title"]
+            day for day in routes["coding-agent-tools-60d"]["days"]
+            if "Copilot" in day["title"] and "安装" in day["title"]
         )
         self.assertIn("copilot version", copilot_day["content"]["knowledge_details"][0]["reference_code"])
         self.assertNotIn("copilot --version", copilot_day["content"]["knowledge_details"][0]["reference_code"])
@@ -313,7 +337,7 @@ class CuratedRoadmapTests(TestCase):
         self.assertEqual(migrated["schema_version"], 2)
         self.assertNotIn("runtime", migrated)
         self.assertEqual(migrated["course_baseline"]["python"], "3.12")
-        self.assertEqual(migrated["content_version"], 7)
+        self.assertEqual(migrated["content_version"], 8)
         self.assertEqual(migrated["roadmaps"][0]["summary"], "使用Python 3.12")
         with self.assertRaises(CatalogError):
             migrate_catalog({"schema_version": 99})
