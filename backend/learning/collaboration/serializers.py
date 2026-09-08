@@ -94,6 +94,7 @@ class TeamChallengeEntrySerializer(serializers.ModelSerializer):
     role_label = serializers.CharField(source="get_role_display", read_only=True)
     evidence_id = serializers.IntegerField(read_only=True)
     evidence_title = serializers.CharField(source="evidence.title", read_only=True, default="证据已删除")
+    evidence_detail = serializers.SerializerMethodField()
     evidence = serializers.PrimaryKeyRelatedField(queryset=Evidence.objects.all(), write_only=True)
 
     class Meta:
@@ -101,6 +102,7 @@ class TeamChallengeEntrySerializer(serializers.ModelSerializer):
         fields = (
             "id", "user_id", "user_name", "role", "role_label", "evidence", "evidence_id",
             "evidence_title", "summary", "created_at", "updated_at",
+            "evidence_detail",
         )
         read_only_fields = (
             "id", "user_id", "user_name", "role_label", "evidence_id", "evidence_title",
@@ -110,6 +112,14 @@ class TeamChallengeEntrySerializer(serializers.ModelSerializer):
     def get_user_name(self, obj):
         """返回适合小队页面展示的成员名称。"""
         return obj.user.first_name or obj.user.username
+
+    def get_evidence_detail(self, obj):
+        """为已获挑战成员权限的请求返回所选证据及签名附件，不公开个人精选标记。"""
+        if not obj.evidence_id:
+            return None
+        data = EvidenceSerializer(obj.evidence, context=self.context).data
+        data.pop("is_featured", None)
+        return data
 
     def validate_summary(self, value):
         """拒绝没有说明复现、测试或复核结论的空提交。"""
@@ -164,9 +174,8 @@ class TeamChallengeSerializer(serializers.ModelSerializer):
         return obj.created_by.first_name or obj.created_by.username
 
     def get_can_complete(self, obj):
-        """至少两名成员承担不同角色后才允许合并并完成挑战。"""
-        entries = list(obj.entries.all())
-        return obj.status == TeamChallenge.Status.OPEN and len(entries) >= 2
+        """返回当前挑战是否满足服务端统一的结算条件。"""
+        return not obj.completion_errors()
 
     def get_expired(self, obj):
         """返回挑战是否已经错过截止时间。"""

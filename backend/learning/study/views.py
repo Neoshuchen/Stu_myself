@@ -432,7 +432,7 @@ class LearningInsightsView(APIView):
                 key = gap.title.strip().casefold()
                 repeated.setdefault(key, {"title": gap.title.strip(), "count": 0, "open_count": 0})
                 repeated[key]["count"] += 1
-                repeated[key]["open_count"] += gap.status == Gap.Status.OPEN
+                repeated[key]["open_count"] += gap.status != Gap.Status.RESOLVED
                 plan_gaps.append({
                     "id": gap.id, "title": gap.title, "detail": gap.detail, "status": gap.status,
                     "day_number": gap.progress.plan_day.day_number, "day_title": gap.progress.plan_day.title,
@@ -443,8 +443,11 @@ class LearningInsightsView(APIView):
                 "current_day": enrollment.current_day, "total_days": enrollment.plan.total_days,
                 "completed_days": completed, "knowledge_learned": learned, "knowledge_total": knowledge_total,
                 "average_recall": round(sum(scores) / len(scores)) if scores else None,
-                "open_gaps": sum(gap.status == Gap.Status.OPEN for gap in gaps), "gaps": plan_gaps,
+                "open_gaps": sum(gap.status != Gap.Status.RESOLVED for gap in gaps), "gaps": plan_gaps,
             })
+        showcase = Evidence.objects.filter(
+            progress__enrollment__user=request.user, is_featured=True,
+        ).select_related("progress__enrollment__plan", "progress__plan_day")
         return Response({
             "summary": {
                 "plans": len(plans), "completed_days": sum(item["completed_days"] for item in plans),
@@ -453,6 +456,17 @@ class LearningInsightsView(APIView):
             },
             "repeated_gaps": sorted(repeated.values(), key=lambda item: (-item["count"], item["title"])),
             "plans": plans,
+            "showcase": [
+                {
+                    **EvidenceSerializer(evidence, context={"request": request}).data,
+                    "plan_slug": evidence.progress.enrollment.plan.slug,
+                    "plan_title": evidence.progress.enrollment.plan.title,
+                    "day_number": evidence.progress.plan_day.day_number,
+                    "enrollment_id": evidence.progress.enrollment_id,
+                    "reflection": evidence.progress.reflection,
+                }
+                for evidence in showcase
+            ],
         })
 
 
@@ -487,8 +501,9 @@ class LearningExportView(APIView):
     """导出当前用户的 Markdown 或 JSON 学习记录。"""
 
     def get(self, request):
+        """导出本人学习记录，包含接续提示、精选状态和全部复习作答历史。"""
         enrollments = Enrollment.objects.filter(user=request.user).select_related("plan").prefetch_related(
-            "progress__plan_day", "progress__evidence", "progress__gaps"
+            "progress__plan_day", "progress__evidence", "progress__gaps", "progress__review_attempts"
         )
         records = []
         for enrollment in enrollments:
@@ -497,7 +512,9 @@ class LearningExportView(APIView):
                 days.append({
                     "day": progress.plan_day.day_number, "title": progress.plan_day.title, "status": progress.status,
                     "reflection": progress.reflection, "recall_score": progress.recall_score,
-                    "evidence": [{"kind": item.kind, "title": item.title, "content": item.content, "url": item.url} for item in progress.evidence.all()],
+                    "resume_note": progress.resume_note,
+                    "reviews": ReviewAttemptSerializer(progress.review_attempts.all(), many=True).data,
+                    "evidence": [{"kind": item.kind, "title": item.title, "content": item.content, "url": item.url, "is_featured": item.is_featured} for item in progress.evidence.all()],
                     "gaps": [{"title": item.title, "detail": item.detail, "status": item.status, "resolution": item.resolution} for item in progress.gaps.all()],
                 })
             records.append({"plan": enrollment.plan.title, "slug": enrollment.plan.slug, "status": enrollment.status, "current_day": enrollment.current_day, "days": days})
@@ -513,7 +530,21 @@ class LearningExportView(APIView):
                 if day["gaps"]:
                     lines.append("- 知识缺口：" + "；".join(item["title"] for item in day["gaps"]))
                 if day["evidence"]:
-                    lines.append("- 学习证据：" + "；".join(item["title"] for item in day["evidence"]))
+                    lines.append("- 学习证据：" + "；".join(item["title"] + ("（展柜精选）" if item["is_featured"] else "") for item in day["evidence"]))
+                lines.append(f"- 下次继续：{day['resume_note'] or '未记录'}")
+                # 保留历次作答和当时解析，题库更新后仍能回顾原始学习记录。
+                for review in day["reviews"]:
+                    lines.extend([
+                        f"#### 复习 {review['reviewed_at']} · {review['rating_label']}",
+                        f"- 下次复习：{review['next_review_at']}（间隔 {review['interval_days']} 天）",
+                        f"- 回忆笔记：{review['note'] or '未记录'}",
+                    ])
+                    for result in review["quiz_results"]:
+                        lines.extend([
+                            f"- 题目：{result['prompt']}",
+                            f"  - 我的选择：{result['selected']}；正确答案：{result['expected']}；结果：{'正确' if result['correct'] else '待巩固'}",
+                            f"  - 解析：{result['explanation']}",
+                        ])
                 lines.append("")
         return Response({"filename": "zhixu-learning-records.md", "mime": "text/markdown;charset=utf-8", "content": "\n".join(lines)})
 
@@ -676,7 +707,11 @@ class DayProgressViewSet(mixins.RetrieveModelMixin, mixins.UpdateModelMixin, vie
     serializer_class = DayProgressSerializer
 
     def get_queryset(self):
-        return DayProgress.objects.filter(enrollment__user=self.request.user).select_related(
+        """返回本人进度；已退出路线仅保留读取历史的权限。"""
+        queryset = DayProgress.objects.filter(enrollment__user=self.request.user)
+        if self.request.method not in permissions.SAFE_METHODS:
+            queryset = queryset.filter(enrollment__status__in=Enrollment.JOINED_STATUSES)
+        return queryset.select_related(
             "enrollment", "plan_day", "plan_day__plan"
         ).prefetch_related("evidence", "gaps")
 
@@ -696,7 +731,7 @@ class DayProgressViewSet(mixins.RetrieveModelMixin, mixins.UpdateModelMixin, vie
     @action(detail=True, methods=["post"])
     def complete(self, request, pk=None):
         with transaction.atomic():
-            progress = self.get_queryset().select_for_update().get(pk=pk)
+            progress = get_object_or_404(self.get_queryset().select_for_update(), pk=pk)
             if progress.status == DayProgress.Status.COMPLETED:
                 return Response(self.get_serializer(progress).data)
             if progress.enrollment.status == Enrollment.Status.PAUSED:
@@ -725,7 +760,11 @@ class OwnedProgressChildMixin:
     """把证据和缺口写操作限制在当前用户的学习进度内。"""
 
     def get_progress(self):
-        return get_object_or_404(DayProgress, pk=self.request.data.get("progress"), enrollment__user=self.request.user)
+        """返回本人仍参与的学习进度，不存在或已退出时返回 404。"""
+        return get_object_or_404(
+            DayProgress, pk=self.request.data.get("progress"), enrollment__user=self.request.user,
+            enrollment__status__in=Enrollment.JOINED_STATUSES,
+        )
 
     def perform_create(self, serializer):
         serializer.save(progress=self.get_progress())
@@ -738,7 +777,22 @@ class EvidenceViewSet(OwnedProgressChildMixin, mixins.CreateModelMixin, mixins.D
     throttle_scope = "upload"
 
     def get_queryset(self):
-        return Evidence.objects.filter(progress__enrollment__user=self.request.user)
+        """返回本人证据；退出路线的证据仍可选入展柜，但不可改动学习事实。"""
+        queryset = Evidence.objects.filter(progress__enrollment__user=self.request.user)
+        if self.action == "destroy":
+            queryset = queryset.filter(progress__enrollment__status__in=Enrollment.JOINED_STATUSES)
+        return queryset
+
+    @action(detail=True, methods=["post"])
+    def feature(self, request, pk=None):
+        """接收布尔 is_featured，更新本人证据的私人成果展柜选择并返回证据。"""
+        evidence = self.get_object()
+        featured = request.data.get("is_featured")
+        if not isinstance(featured, bool):
+            return Response({"is_featured": ["展柜选择必须是布尔值。"]}, status=400)
+        evidence.is_featured = featured
+        evidence.save(update_fields=["is_featured"])
+        return Response(self.get_serializer(evidence).data)
 
 
 class GapViewSet(OwnedProgressChildMixin, mixins.CreateModelMixin, mixins.UpdateModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
@@ -747,12 +801,14 @@ class GapViewSet(OwnedProgressChildMixin, mixins.CreateModelMixin, mixins.Update
     serializer_class = GapSerializer
 
     def get_queryset(self):
+        """仅允许继续编辑或验证尚未退出路线的缺口。"""
+        queryset = Gap.objects.filter(progress__enrollment__status__in=Enrollment.JOINED_STATUSES)
         if self.action == "verify":
-            return Gap.objects.filter(
+            return queryset.filter(
                 status=Gap.Status.VERIFYING,
                 verification_group__members=self.request.user,
             ).select_related("progress__enrollment__user", "progress__plan_day").distinct()
-        return Gap.objects.filter(progress__enrollment__user=self.request.user)
+        return queryset.filter(progress__enrollment__user=self.request.user)
 
     @action(detail=True, methods=["post"], url_path="request-verification")
     def request_verification(self, request, pk=None):

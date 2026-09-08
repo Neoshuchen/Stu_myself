@@ -39,6 +39,14 @@ const resultText = computed(() => {
 
 onMounted(() => load(route.query.group))
 
+/** 用现有讲解、复现分工准备接力挑战，保留用户设置的截止时间并等待主动发布。 */
+function prepareTeachBack() {
+  if ((challengeForm.value.title || challengeForm.value.description) && !confirm('用讲解接力模板替换尚未发布的挑战文字？')) return
+  challengeForm.value.title = '讲解接力：把一个知识点讲到可复现'
+  challengeForm.value.description = '共同主题（请填写）：\n1. 讲解者：用自己的话写约 200 字，说明原理、一个例子和适用边界，提交讲解笔记证据。\n2. 复现者：只按讲解完成一次练习，记录结果及仍不清楚的地方，提交自己的复现证据。\n3. 讲解者：根据反馈修正说明，更新分工证据与结论。\n4. 双方核对修正后的结果，再合并挑战。'
+  document.querySelector('.challenge-create').open = true
+}
+
 async function load(preferredGroup = '') {
   error.value = ''
   try {
@@ -280,13 +288,21 @@ function formatDateTime(value) {
         <section class="panel challenge-board">
           <div class="section-title"><div><span class="eyebrow">CO-OP CHALLENGE</span><h2>小队协作挑战</h2></div><span>{{ challenges.filter(item => item.status === 'open').length }} 项进行中</span></div>
           <p class="muted">不同成员分别复现、测试、讲解或复核，提交已有学习证据后再合并完成。</p>
+          <button class="button secondary" :disabled="busy" @click="prepareTeachBack">用讲解接力模板发起</button>
           <details class="challenge-create"><summary>发起一个新挑战</summary><form class="form-stack" @submit.prevent="createChallenge"><label>挑战名称<input v-model.trim="challengeForm.title" required maxlength="160" placeholder="例如：联合排查一次失败实验" /></label><label>共同任务<textarea v-model.trim="challengeForm.description" required rows="3" placeholder="写清目标、失败条件和最终要合并的结论。"></textarea></label><label>截止时间<input v-model="challengeForm.deadline" type="datetime-local" required /></label><button class="button secondary" :disabled="busy">发起挑战</button></form></details>
           <div v-if="challenges.length" class="challenge-list">
             <article v-for="challenge in challenges" :key="challenge.id" :class="{ completed: challenge.status === 'completed' }">
               <header><div><span>{{ challenge.created_by_name }} 发起 · 截止 {{ formatDateTime(challenge.deadline) }}</span><h3>{{ challenge.title }}</h3></div><strong>{{ challenge.status_label }}</strong></header>
               <p>{{ challenge.description }}</p>
-              <div class="challenge-entries"><span v-for="entry in challenge.entries" :key="entry.id"><b>{{ entry.role_label }}</b>{{ entry.user_name }} · {{ entry.evidence_title }}</span></div>
+              <div class="challenge-entries"><article v-for="entry in challenge.entries" :key="entry.id">
+                <b>{{ entry.role_label }} · {{ entry.user_name }}</b><p class="content-body">{{ entry.summary }}</p>
+                <details v-if="entry.evidence_detail"><summary>查看证据：{{ entry.evidence_title }}</summary><p class="content-body">{{ entry.evidence_detail.content }}</p>
+                  <a v-if="entry.evidence_detail.url" :href="entry.evidence_detail.url" target="_blank" rel="noopener noreferrer">打开证据链接 ↗</a>
+                  <a v-if="entry.evidence_detail.attachment_url" :href="entry.evidence_detail.attachment_url" target="_blank" rel="noopener noreferrer">查看附件 {{ entry.evidence_detail.attachment_name }}</a>
+                </details><p v-else class="muted">证据已删除，请作者重新提交。</p>
+              </article></div>
               <form v-if="challenge.status === 'open' && !challenge.expired && dashboard.evidence_options.length" class="challenge-entry-form" @submit.prevent="contribute(challenge)">
+                <p class="challenge-summary muted">提交后，本小队成员可以查看你的过程说明，以及所选证据的正文、链接和附件。</p>
                 <label>我的分工<select v-model="entryForms[challenge.id].role" required><option v-for="role in challengeRoles" :key="role.value" :value="role.value" :disabled="roleDisabled(challenge, role.value)">{{ role.label }}{{ roleDisabled(challenge, role.value) ? ' · 已有人承担' : '' }}</option></select></label>
                 <label>学习证据<select v-model="entryForms[challenge.id].evidence" required><option v-for="evidence in dashboard.evidence_options" :key="evidence.id" :value="String(evidence.id)">{{ evidence.plan_title }} Day {{ evidence.day_number }} · {{ evidence.title }}</option></select></label>
                 <label class="challenge-summary">过程与结论<textarea v-model.trim="entryForms[challenge.id].summary" required rows="2" placeholder="说明你做了什么、发现了什么。"></textarea></label>
@@ -301,7 +317,7 @@ function formatDateTime(value) {
         </section>
 
         <section v-if="resultCard" class="result-card panel">
-          <div><span class="eyebrow">WEEKLY RESULT</span><h2>{{ resultCard.user_name }} 的本周成果</h2><p>{{ formatDate(resultCard.week_start) }} — {{ formatDate(resultCard.week_end) }} · {{ resultCard.group_name }}</p><p v-if="resultCard.target_days" :class="resultCard.goal_met ? 'goal-met' : 'muted'">周契约：{{ resultCard.completed_days }}/{{ resultCard.target_days }} 天{{ resultCard.goal_met ? ' · 已兑现' : ' · 继续前进' }}</p></div>
+          <div><span class="eyebrow">WEEKLY RESULT</span><h2>{{ resultCard.user_name }} 的本周成果</h2><p>{{ formatDate(resultCard.week_start) }} — {{ formatDate(resultCard.week_end) }} · {{ resultCard.group_name }}</p><p v-if="resultCard.target_days" :class="resultCard.goal_met ? 'goal-met' : 'muted'">周契约：{{ resultCard.contract_completed_days }}/{{ resultCard.target_days }} 天{{ resultCard.goal_met ? ' · 已兑现' : ' · 继续前进' }}</p></div>
           <div class="result-stats"><span><strong>{{ resultCard.completed_days }}</strong>学习日</span><span><strong>{{ resultCard.evidence_count }}</strong>份证据</span><span><strong>{{ resultCard.resolved_gaps }}</strong>个缺口</span><span><strong>{{ resultCard.peer_reviews }}</strong>次互评</span><span><strong>{{ resultCard.challenges_completed }}</strong>次挑战</span><span><strong>{{ resultCard.current_streak }}</strong>天连续</span></div>
           <button class="button secondary" @click="shareResult">分享成果文字</button>
         </section>

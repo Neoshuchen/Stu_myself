@@ -88,6 +88,7 @@ function calendarLabel(item) {
             <span class="card-kicker">DAY {{ data.current_progress.day.day_number }} · 第 {{ data.current_progress.day.week_number }} 周</span>
             <h2>{{ data.current_progress.day.title }}</h2>
             <p>{{ data.current_progress.day.hands_on_task }}</p>
+            <p v-if="data.current_progress.resume_note">上次留给自己的提示：{{ data.current_progress.resume_note }}</p>
             <div class="meta-row"><span>{{ data.current_progress.day.estimated_minutes }} 分钟</span><span>{{ data.current_progress.day.week_title }}</span></div>
             <button class="button light" @click="openToday">{{ actionLabel() }}</button>
           </div>

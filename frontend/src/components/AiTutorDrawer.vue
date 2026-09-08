@@ -21,12 +21,14 @@ const sessions = ref([])
 const activeSession = ref(null)
 const messages = ref([])
 const loading = ref(false)
+let sessionLoadVersion = 0
 const sending = ref(false)
 const configBusy = ref(false)
 const preparingFiles = ref(false)
 const error = ref('')
 const configNotice = ref('')
 const draft = ref('')
+const focus = ref(null)
 const files = ref([])
 const temporaryKey = ref('')
 const temporaryKeyEndpoint = ref('')
@@ -56,6 +58,7 @@ const temporaryKeyMatchesEndpoint = computed(() => (
 ))
 const canSend = computed(() => (
   !sending.value
+  && !loading.value
   && !preparingFiles.value
   && (activeSession.value || configured.value)
   && (!needsTemporaryKey.value || temporaryKeyMatchesEndpoint.value)
@@ -75,12 +78,25 @@ async function openConfiguration() {
   if (initialized.value && catalog.value?.enabled) showConfiguration()
 }
 
+/** 接收知识点标题和正文，准备新对话草稿；只在用户发送时提交上下文。 */
+async function openFocus(context) {
+  await open()
+  if (sending.value) {
+    error.value = '当前问题仍在发送，请完成后再选择知识点。'
+    return
+  }
+  startNewSession()
+  focus.value = { title: String(context?.title || '').slice(0, 160), content: String(context?.content || '').slice(0, 4000) }
+  if (!draft.value.trim()) draft.value = '请用一个具体例子引导我理解这个知识点，先问我一个问题，再根据回答给提示。'
+}
+
 /** 关闭全局抽屉；临时 Key 仅保留到当前登录页面生命周期结束。 */
 function close() {
   if (dialog.value?.open) dialog.value.close()
 }
 
 async function loadAssistant() {
+  const version = sessionLoadVersion
   loading.value = true
   error.value = ''
   configNotice.value = ''
@@ -99,9 +115,10 @@ async function loadAssistant() {
     else if (savedCredentials.length) applyCredential(savedCredentials[0])
     else resetConfigurationForm()
   } catch (err) {
-    error.value = err.message
+    if (version === sessionLoadVersion) error.value = err.message
   } finally {
-    loading.value = false
+    // 初始会话也可能被用户的新选择替代，外层请求不能提前解除后续加载状态。
+    if (version === sessionLoadVersion) loading.value = false
   }
 }
 
@@ -246,6 +263,9 @@ function editCredential(credential) {
 }
 
 function showConfiguration() {
+  if (sending.value) return
+  sessionLoadVersion += 1
+  loading.value = false
   activeSession.value = null
   messages.value = []
   configured.value = false
@@ -255,14 +275,20 @@ function showConfiguration() {
 }
 
 async function loadSession(id) {
+  if (sending.value) return
+  focus.value = null
   if (!id) {
     startNewSession()
     return
   }
+  const version = ++sessionLoadVersion
   loading.value = true
   error.value = ''
   try {
-    activeSession.value = await api(`/ai/chats/${id}/`)
+    const loaded = await api(`/ai/chats/${id}/`)
+    // 只允许最后一次选择更新会话；新对话和配置页也会废止旧请求。
+    if (version !== sessionLoadVersion) return
+    activeSession.value = loaded
     messages.value = activeSession.value.messages || []
     provider.value = activeSession.value.provider
     adapter.value = activeSession.value.adapter || ''
@@ -278,13 +304,17 @@ async function loadSession(id) {
     configured.value = true
     await scrollToLatest()
   } catch (err) {
-    error.value = err.message
+    if (version === sessionLoadVersion) error.value = err.message
   } finally {
-    loading.value = false
+    if (version === sessionLoadVersion) loading.value = false
   }
 }
 
 function startNewSession() {
+  if (sending.value) return
+  sessionLoadVersion += 1
+  loading.value = false
+  focus.value = null
   if (activeSession.value) {
     selectedCredentialId.value = activeSession.value.credential
     provider.value = activeSession.value.provider
@@ -395,6 +425,7 @@ async function sendMessage() {
   if (!canSend.value) return
   const submittedContent = draft.value.trim()
   const submittedFiles = [...files.value]
+  const submittedFocus = focus.value ? { ...focus.value } : null
   const optimisticId = `pending-${Date.now()}`
   const optimisticMessage = {
     id: optimisticId,
@@ -410,12 +441,17 @@ async function sendMessage() {
   messages.value.push(optimisticMessage)
   draft.value = ''
   files.value = []
+  focus.value = null
   if (fileInput.value) fileInput.value.value = ''
   await scrollToLatest()
   try {
     const session = activeSession.value || await createSession(submittedContent)
     const form = new FormData()
     form.append('content', submittedContent)
+    if (submittedFocus) {
+      form.append('focus_title', submittedFocus.title)
+      form.append('focus_content', submittedFocus.content)
+    }
     if (temporaryKeyMatchesEndpoint.value) form.append('api_key', temporaryKey.value)
     submittedFiles.forEach((file) => form.append('attachments', file))
     const result = await api(`/ai/chats/${session.id}/messages/`, { method: 'POST', body: form })
@@ -431,6 +467,7 @@ async function sendMessage() {
     messages.value = messages.value.filter((message) => message.id !== optimisticId)
     draft.value = submittedContent
     files.value = submittedFiles
+    focus.value = submittedFocus
     error.value = err.message
   } finally {
     sending.value = false
@@ -442,7 +479,7 @@ async function scrollToLatest() {
   if (messageList.value) messageList.value.scrollTop = messageList.value.scrollHeight
 }
 
-defineExpose({ open, openConfiguration })
+defineExpose({ open, openConfiguration, openFocus })
 </script>
 
 <template>
@@ -538,6 +575,12 @@ defineExpose({ open, openConfiguration })
           </div>
 
           <form class="ai-composer" @submit.prevent="sendMessage">
+            <details v-if="focus" class="ai-focus-preview" open>
+              <summary>下一条消息将附带此知识点</summary>
+              <label>知识点标题<input v-model="focus.title" maxlength="160" /></label>
+              <label>将发送的正文<textarea v-model="focus.content" rows="4" maxlength="4000"></textarea></label>
+              <button type="button" class="text-action" @click="focus = null">移除知识点上下文</button>
+            </details>
             <div class="ai-composer-box">
               <textarea v-model="draft" rows="3" :maxlength="6000" :disabled="sending" placeholder="输入问题，可直接粘贴图片；Enter 发送，Shift+Enter 换行" @paste="imagesPasted" @keydown="composerKeydown"></textarea>
               <div v-if="files.length" class="ai-selected-attachments" aria-label="待发送附件">

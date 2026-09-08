@@ -52,6 +52,7 @@ class AIAssistantAPITests(TestCase):
     def setUp(self):
         """创建一条最小学习日和两个隔离用户。"""
         cache.clear()
+        caches["default"].clear()  # 用户主键会复用，不能继承上一用例的限流计数。
         self.user = User.objects.create_user(username="ai-user", password="secret-pass")
         self.other = User.objects.create_user(username="ai-other", password="secret-pass")
         self.plan = LearningPlan.objects.create(
@@ -418,6 +419,27 @@ class AIAssistantAPITests(TestCase):
         self.assertEqual([item["name"] for item in user_message.attachments], ["question.jpg", "trace.py"])
         self.assertNotIn("data", str(user_message.attachments))
         self.assertNotIn("raise ValueError", str(user_message.attachments))
+
+    @patch("learning.ai.views.call_provider")
+    def test_explicit_focus_is_persisted_without_automatic_lesson_context(self, call):
+        """全局知识点辅导仅发送显式选择的正文，后续对话仍保留该快照。"""
+        session = self.create_session(progress=None, include_current_lesson=False)
+        self.assertFalse(call.called)
+        call.return_value = ProviderResult("先试着画出两个名字的指向。", 20, 10, "focus-test")
+        response = self.client.post(f"/api/ai/chats/{session.pk}/messages/", {
+            "content": "请给一个提示", "api_key": "temporary-key",
+            "focus_title": "变量绑定", "focus_content": "赋值让名字指向对象。",
+        }, format="multipart")
+        self.assertEqual(response.status_code, 201, response.data)
+        supplied = call.call_args.args[4][-1]["content"]
+        self.assertIn("赋值让名字指向对象。", supplied)
+        self.assertNotIn("AI 测试课程", supplied)
+        message = session.messages.get(role="user")
+        self.assertEqual(message.context_snapshot, {"title": "变量绑定", "content": "赋值让名字指向对象。"})
+        history = build_provider_messages(session, "再举一个例子", [], {})
+        self.assertTrue(any("赋值让名字指向对象。" in item["content"] for item in history))
+        self.progress.refresh_from_db()
+        self.assertEqual(self.progress.status, DayProgress.Status.IN_PROGRESS)
 
     @patch("learning.ai.views.call_provider")
     def test_provider_failure_keeps_history_and_learning_state_unchanged(self, call):

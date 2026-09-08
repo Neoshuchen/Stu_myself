@@ -3,6 +3,7 @@ from datetime import timedelta
 from django.utils import timezone
 
 from ..models import Contribution, DayProgress, Enrollment, Evidence, Gap, PlanDay, ReviewAttempt
+from .practice import review_quiz
 
 LEVEL_XP = 500
 INITIAL_REVIEW_DAYS = 3
@@ -82,14 +83,15 @@ def review_interval_days(rating, previous_interval=0):
     return min(MAX_REVIEW_DAYS, max(7, previous_interval * 2))
 
 
-def record_review(progress, rating, note=""):
-    """为已完成学习日记录复习，并安排下一次复习时间。"""
+def record_review(progress, rating, note="", quiz_results=None):
+    """按学习日、评级和可选笔记/判分快照创建复习记录，返回包含下次时间的记录。"""
     previous = progress.review_attempts.order_by("-reviewed_at").first()
     interval = review_interval_days(rating, previous.interval_days if previous else 0)
     return ReviewAttempt.objects.create(
         progress=progress,
         rating=rating,
         note=note.strip(),
+        quiz_results=quiz_results or [],
         interval_days=interval,
         next_review_at=timezone.now() + timedelta(days=interval),
     )
@@ -173,7 +175,7 @@ def review_center(user):
         enrollment__user=user,
         enrollment__status__in=Enrollment.JOINED_STATUSES,
         status=DayProgress.Status.COMPLETED,
-    ).select_related("enrollment__plan", "plan_day").prefetch_related("gaps", "review_attempts")
+    ).select_related("enrollment__plan", "plan_day__plan").prefetch_related("gaps", "review_attempts")
     items = []
     for progress in progress_items:
         attempts = list(progress.review_attempts.all())
@@ -210,6 +212,8 @@ def review_center(user):
             "due_at": due_at,
             "due": due_at <= now,
             "reason": reason,
+            "quiz": review_quiz(progress.plan_day) if due_at <= now else None,
+            "latest_results": latest.quiz_results if latest else [],
         })
     items.sort(key=lambda item: (not item["due"], item["due_at"]))
     due = [item for item in items if item["due"]]

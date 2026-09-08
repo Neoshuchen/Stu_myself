@@ -23,6 +23,7 @@ const evidenceError = ref('')
 const preparingEvidence = ref(false)
 const gapForm = ref({ title: '', detail: '' })
 const gapResolutions = reactive({})
+const sessionMinutes = ref(15)
 let saveQueue = Promise.resolve()
 let loadVersion = 0
 const checksComplete = computed(() => progress.value?.acceptance_checks.length && progress.value.acceptance_checks.every(Boolean))
@@ -36,6 +37,14 @@ const learningObjectives = computed(() => lessonContent.value.learning_objective
 const conceptMap = computed(() => lessonContent.value.concept_map || [])
 const comprehensiveTask = computed(() => lessonContent.value.comprehensive_task || null)
 const verification = computed(() => lessonContent.value.verification || null)
+const nextKnowledgeIndex = computed(() => progress.value?.knowledge_checks.findIndex(value => !value) ?? -1)
+const nextCriterion = computed(() => progress.value?.day.acceptance_criteria.find((_item, index) => !progress.value.acceptance_checks[index]))
+const sessionTask = computed(() => {
+  const next = knowledgeDetails.value[nextKnowledgeIndex.value]
+  if (sessionMinutes.value === 60) return nextCriterion.value || '整理本日实验结果，保存一份可核对的学习证据。'
+  if (!next) return nextCriterion.value || '闭卷回顾今天的主题，写下仍不确定的问题。'
+  return sessionMinutes.value === 15 ? `用自己的话解释“${next.name}”，再核对一个具体例子。` : next.implementation_requirement
+})
 const shareLink = computed(() => {
   if (!progress.value) return '/community/new'
   const params = new URLSearchParams({ day: progress.value.day.day_number, type: 'check_in' })
@@ -63,6 +72,7 @@ function saveProgress(message = '学习记录已保存', strict = false) {
     acceptance_checks: [...progress.value.acceptance_checks],
     knowledge_checks: [...progress.value.knowledge_checks],
     reflection: progress.value.reflection,
+    resume_note: progress.value.resume_note,
     recall_score: progress.value.recall_score,
   }
   const request = saveQueue.then(() => api(`/progress/${progressId}/`, {
@@ -84,44 +94,97 @@ function saveProgress(message = '学习记录已保存', strict = false) {
 }
 
 async function addEvidence() {
+  const current = progress.value
   evidenceError.value = ''
   const form = new FormData()
   form.append('progress', progress.value.id)
   Object.entries(evidenceForm.value).forEach(([key, value]) => { if (value) form.append(key, value) })
   busy.value = true
   try {
-    await api('/evidence/', { method: 'POST', body: form })
-    await saveQueue
+    const saved = await api('/evidence/', { method: 'POST', body: form })
+    // 子记录只更新自己的列表，不能用服务端旧快照覆盖仍在保存的学习草稿。
+    current.evidence.unshift(saved)
+    if (progress.value !== current) return
     evidenceForm.value = { kind: 'test', title: '', content: '', url: '', attachment: null }
     if (evidenceFileInput.value) evidenceFileInput.value.value = ''
-    await load()
     notice.value = '证据已收好'
   } catch (err) { evidenceError.value = err.message } finally { busy.value = false }
 }
 
 async function removeEvidence(id) {
-  await api(`/evidence/${id}/`, { method: 'DELETE' })
-  await load()
+  const current = progress.value
+  busy.value = true
+  try {
+    await saveProgress('', true)
+    await api(`/evidence/${id}/`, { method: 'DELETE' })
+    current.evidence = current.evidence.filter(item => item.id !== id)
+  } catch (err) { error.value = err.message } finally { busy.value = false }
+}
+
+/** 切换本人证据的私人成果展柜选择；失败时保留当前界面状态。 */
+async function featureEvidence(item) {
+  busy.value = true
+  try {
+    const saved = await api(`/evidence/${item.id}/feature/`, { method: 'POST', body: JSON.stringify({ is_featured: !item.is_featured }) })
+    item.is_featured = saved.is_featured
+    notice.value = saved.is_featured ? '已选入私人成果展柜，可在学习洞察中查看' : '已移出成果展柜'
+  } catch (err) { error.value = err.message } finally { busy.value = false }
+}
+
+/** 下载固定实验的源码与断言，供用户在本地 Python 中复现和修复。 */
+function downloadLab() {
+  const lab = progress.value.day.lab
+  const text = `# ${lab.title}\n# ${lab.brief}\n# 修复函数后运行：python ${lab.id}.py（不要使用 -O，否则会跳过断言）\n\n${lab.starter}\n${lab.checks}\nprint("全部检查通过，请再补充自己的边界样例。")\n`
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${lab.id}.py`
+  link.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+/** 把案件验收要求放入现有证据表单草稿，等待用户填写实际结果并提交。 */
+function prepareLabEvidence() {
+  if ((evidenceForm.value.title || evidenceForm.value.content) && !confirm('用案件记录模板替换当前未提交的证据文字？')) return
+  evidenceForm.value.title = progress.value.day.lab.title
+  evidenceForm.value.kind = 'test'
+  evidenceForm.value.content = '复现命令与环境：\n修复前的失败输出：\n根因：\n修改说明：\n修复后的检查输出：\n我补充的边界样例：'
+  document.querySelector('.evidence-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+/** 把选中知识点作为待确认的 AI 上下文，打开抽屉但不发送请求给模型。 */
+function askAboutKnowledge() {
+  const item = selectedKnowledge.value
+  const detail = {
+    title: item.name.slice(0, 160),
+    content: [`主题：${item.name}`, item.summary, item.basic, item.mechanism, `练习要求：${item.implementation_requirement}`].join('\n\n').slice(0, 4000),
+  }
+  closeKnowledge()
+  window.dispatchEvent(new CustomEvent('open-ai-focus', { detail }))
 }
 
 async function addGap() {
+  const current = progress.value
   busy.value = true
   try {
-    await api('/gaps/', { method: 'POST', body: JSON.stringify({ progress: progress.value.id, ...gapForm.value }) })
+    const saved = await api('/gaps/', { method: 'POST', body: JSON.stringify({ progress: current.id, ...gapForm.value }) })
+    current.gaps.unshift(saved)
+    if (progress.value !== current) return
     gapForm.value = { title: '', detail: '' }
-    await load()
   } catch (err) { error.value = err.message } finally { busy.value = false }
 }
 
 async function requestGapVerification(gap) {
+  const current = progress.value
   busy.value = true
   error.value = ''
   try {
-    await api(`/gaps/${gap.id}/request-verification/`, {
+    const saved = await api(`/gaps/${gap.id}/request-verification/`, {
       method: 'POST',
       body: JSON.stringify({ resolution: gapResolutions[gap.id] || gap.resolution || '' }),
     })
-    await load()
+    current.gaps = current.gaps.map(item => item.id === saved.id ? saved : item)
+    if (progress.value !== current) return
     notice.value = '已邀请小队朋友验证这个缺口'
     window.dispatchEvent(new Event('notifications-changed'))
   } catch (err) { error.value = err.message } finally { busy.value = false }
@@ -225,7 +288,21 @@ async function requestPeerReview() {
 
       <div class="lesson-layout">
         <article class="lesson-content" tabindex="0" aria-label="学习正文">
+          <section class="panel short-study" aria-label="短时学习">
+            <div class="section-title"><div><span class="eyebrow">ONE SMALL STEP</span><h2>今天先学一小段</h2></div><label>可用时间 <select v-model.number="sessionMinutes"><option :value="15">15 分钟</option><option :value="30">30 分钟</option><option :value="60">60 分钟</option></select></label></div>
+            <p>{{ sessionTask }}</p><small>按可用时间选择一项任务；完成整日仍需全部知识点、验收项和证据。</small>
+            <button v-if="nextKnowledgeIndex >= 0 && sessionMinutes !== 60" class="button secondary" @click="openKnowledge(knowledgeDetails[nextKnowledgeIndex], nextKnowledgeIndex)">打开下一个知识点</button>
+            <label>下次从这里继续<textarea v-model="progress.resume_note" maxlength="500" rows="2" placeholder="例如：已复现正常输入，下次补充空列表测试。" @change="saveProgress('接续提示已保存')"></textarea></label>
+            <button class="button ghost" :disabled="busy" @click="saveProgress('本段记录已保存，下次可从接续提示继续')">保存本段进度</button>
+          </section>
           <section class="task-callout"><div><span class="eyebrow">最终复现任务</span><h2>{{ progress.day.hands_on_task }}</h2></div></section>
+
+          <section v-if="progress.day.lab" class="panel detective-lab">
+            <span class="eyebrow">BUG DETECTIVE</span><h2>{{ progress.day.lab.title }}</h2><p>{{ progress.day.lab.brief }}</p>
+            <ol><li>下载案件，在本地运行并保留失败输出。</li><li>说明根因，修复函数并保留检查项。</li><li>全部检查通过后，再补一个边界样例并提交证据。</li></ol>
+            <div class="button-row"><button class="button secondary" @click="downloadLab">下载 Python 案件</button><button class="button ghost" @click="prepareLabEvidence">填写案件证据</button></div>
+            <details><summary>我已尝试，查看线索</summary><p>{{ progress.day.lab.hint }}</p><details><summary>核对修复思路</summary><p>{{ progress.day.lab.solution }}</p></details></details>
+          </section>
 
           <section v-if="prerequisites.length || learningObjectives.length" class="lesson-orientation">
             <div v-if="prerequisites.length"><span class="eyebrow">开始前应具备</span><ul><li v-for="item in prerequisites" :key="item">{{ item }}</li></ul></div>
@@ -305,7 +382,7 @@ async function requestPeerReview() {
           <section class="panel evidence-card">
             <div class="section-title mini"><h2>学习证据</h2><span>{{ progress.evidence.length }}</span></div>
             <div v-if="progress.evidence.length" class="evidence-list">
-              <div v-for="item in progress.evidence" :key="item.id" class="evidence-item"><div><b>{{ item.title }}</b><small>{{ item.kind }} · {{ new Date(item.created_at).toLocaleDateString('zh-CN') }}</small><a v-if="item.url" :href="item.url" target="_blank" rel="noopener">查看链接</a><a v-if="item.attachment_url" :href="item.attachment_url" target="_blank" rel="noopener"><img v-if="item.attachment_is_image" :src="item.attachment_url" :alt="item.title" loading="lazy" /><span v-else>查看附件 {{ item.attachment_name }}</span></a></div><button aria-label="删除证据" @click="removeEvidence(item.id)">×</button></div>
+              <div v-for="item in progress.evidence" :key="item.id" class="evidence-item"><div><b>{{ item.title }}</b><small>{{ item.kind }} · {{ new Date(item.created_at).toLocaleDateString('zh-CN') }}</small><a v-if="item.url" :href="item.url" target="_blank" rel="noopener">查看链接</a><a v-if="item.attachment_url" :href="item.attachment_url" target="_blank" rel="noopener"><img v-if="item.attachment_is_image" :src="item.attachment_url" :alt="item.title" loading="lazy" /><span v-else>查看附件 {{ item.attachment_name }}</span></a><button type="button" class="text-action" :disabled="busy" :aria-pressed="item.is_featured" @click="featureEvidence(item)">{{ item.is_featured ? '★ 已选入展柜' : '☆ 选入私人成果展柜' }}</button></div><button aria-label="删除证据" :disabled="busy" @click="removeEvidence(item.id)">×</button></div>
             </div>
             <form class="mini-form" @submit.prevent="addEvidence">
               <div class="form-pair"><select v-model="evidenceForm.kind"><option value="test">测试结果</option><option value="commit">Git提交</option><option value="code">代码</option><option value="log">日志</option><option value="report">报告</option><option value="link">链接</option><option value="note">笔记</option></select><input v-model.trim="evidenceForm.title" required placeholder="证据标题" /></div>
@@ -355,7 +432,7 @@ async function requestPeerReview() {
             <section><span class="detail-label">需要掌握的结果</span><ul class="mastery-list"><li v-for="item in selectedKnowledge.mastery" :key="item">{{ item }}</li></ul></section>
             <section v-if="selectedKnowledge.resources?.length"><span class="detail-label">参考资料</span><div class="resource-list"><a v-for="resource in selectedKnowledge.resources" :key="resource.url" :href="resource.url" target="_blank" rel="noopener noreferrer"><span>{{ resource.title }}</span><b aria-hidden="true">↗</b></a></div></section>
           </div>
-          <footer><span>{{ progress.knowledge_checks[selectedKnowledgeIndex] ? '这个知识点已标记完成' : '完成复现并核对结果后再继续' }}</span><button class="button secondary" @click="markKnowledgeComplete">{{ progress.knowledge_checks[selectedKnowledgeIndex] ? '已学习' : '完成复现，标记已学习' }}</button></footer>
+          <footer><button class="button ghost" @click="askAboutKnowledge">让 AI 辅导这个知识点</button><button class="button secondary" @click="markKnowledgeComplete">{{ progress.knowledge_checks[selectedKnowledgeIndex] ? '已学习' : '完成复现，标记已学习' }}</button></footer>
         </article>
       </dialog>
     </div>

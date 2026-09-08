@@ -23,6 +23,13 @@ const availableDays = computed(() => selectedPlan.value?.days || [])
 
 onMounted(async () => {
   try {
+    // 展柜草稿只经过浏览器导航状态；点击发布前不会写入社区。
+    const showcaseDraft = window.history.state?.showcaseDraft
+    if (!editing.value && !fixedPlan.value && showcaseDraft) {
+      form.value.title = String(showcaseDraft.title || '').slice(0, 160)
+      form.value.content = String(showcaseDraft.content || '')
+      form.value.post_type = 'project'
+    }
     plans.value = await api('/plans/')
     if (fixedPlan.value) {
       selectedPlan.value = await api(`/plans/${route.params.slug}/`)

@@ -4,6 +4,7 @@ import shutil
 import tempfile
 from io import BytesIO
 from pathlib import Path
+from types import SimpleNamespace
 from urllib.parse import urlparse
 from unittest.mock import patch
 
@@ -29,6 +30,8 @@ from .ai.providers import ProviderResult
 from .ai.services import encrypt_api_key
 from .study.roadmap_catalog import CatalogError, SYSTEM_ROADMAPS, migrate_catalog
 from .study.serializers import ReviewAttemptSerializer
+from .study.practice import PRACTICE, practice_for, review_quiz
+from .study.experience import review_center
 
 User = get_user_model()
 
@@ -555,6 +558,7 @@ class MarkdownRoadmapPreviewTests(TestCase):
     def setUp(self):
         """创建两个隔离用户和一条可用于模型调用的账号配置。"""
         caches["ai"].clear()
+        caches["default"].clear()  # DRF 限流计数也必须在各用例间隔离。
         self.user = User.objects.create_user(username="roadmap-user", password="safe-password-123")
         self.other = User.objects.create_user(username="roadmap-other", password="safe-password-123")
         self.credential = AIProviderCredential.objects.create(
@@ -1796,6 +1800,29 @@ class WithdrawPreviewAndAdminScopeTests(TestCase):
         self.assertEqual(self.client.get("/api/buddy-profiles/").data, [])
         self.assertFalse(BuddyProfile.objects.get(enrollment_id=self.enrollment_id).active)
 
+    def test_withdrawn_progress_and_children_are_read_only_until_rejoining(self):
+        """退出后各条写入路径均拒绝，保留历史且重新加入后恢复正常保存。"""
+        progress = self.client.get(f"/api/enrollments/{self.enrollment_id}/day/?number=1").data
+        progress_id = progress["id"]
+        evidence = Evidence.objects.create(progress_id=progress_id, kind="note", title="历史", content="保留")
+        gap = Gap.objects.create(progress_id=progress_id, title="待解决")
+        self.client.delete(f"/api/enrollments/{self.enrollment_id}/")
+        for action in ("start", "complete"):
+            with self.subTest(action=action):
+                self.assertEqual(self.client.post(f"/api/progress/{progress_id}/{action}/").status_code, 404)
+        self.assertEqual(self.client.patch(f"/api/progress/{progress_id}/", {"resume_note": "不应写入"}).status_code, 404)
+        for endpoint in ("evidence", "gaps"):
+            self.assertEqual(self.client.post(f"/api/{endpoint}/", {
+                "progress": progress_id, "kind": "note", "title": "新的记录", "content": "不应创建",
+            }).status_code, 404)
+        self.assertEqual(self.client.patch(f"/api/gaps/{gap.id}/", {"title": "不应改写"}).status_code, 404)
+        self.assertEqual(self.client.delete(f"/api/evidence/{evidence.id}/").status_code, 404)
+        self.assertEqual(self.client.get(f"/api/progress/{progress_id}/").status_code, 200)
+        self.assertEqual(Enrollment.objects.get(pk=self.enrollment_id).status, Enrollment.Status.WITHDRAWN)
+        self.client.post(f"/api/plans/{self.plan.slug}/enroll/")
+        self.assertEqual(self.client.patch(f"/api/progress/{progress_id}/", {"resume_note": "继续学习"}).status_code, 200)
+        self.assertEqual(self.client.post("/api/progress/999999/complete/").status_code, 404)
+
     def test_preview_window_is_read_only_and_stops_five_days_ahead(self):
         limit = 1 + 5
         allowed = self.client.get(f"/api/plans/{self.plan.slug}/day/?number={limit}")
@@ -1911,7 +1938,15 @@ class WithdrawPreviewAndAdminScopeTests(TestCase):
 
 
 class AdminUserDeletionTests(TestCase):
+    """在隔离媒体目录中验证管理员删除用户及关联记录。"""
+
     def setUp(self):
+        """准备测试账号，并把可能被删除的媒体目录限制在临时目录。"""
+        media = tempfile.TemporaryDirectory()
+        self.addCleanup(media.cleanup)
+        media_settings = override_settings(MEDIA_ROOT=media.name)
+        media_settings.enable()
+        self.addCleanup(media_settings.disable)
         self.staff = User.objects.create_user(username="site-admin", password="safe-password-123", is_staff=True)
         self.root = User.objects.create_superuser(username="root", password="safe-password-123")
         self.target = User.objects.create_user(username="leaving", password="safe-password-123")
@@ -2541,3 +2576,213 @@ class StudyTeamPhaseTwoTests(TestCase):
         self.assertEqual(card.data["peer_reviews"], 1)
         self.assertTrue(card.data["goal_met"])
         self.assertFalse(hasattr(TeamChallengeEntry, "weekly_total"))
+
+    def test_deleted_evidence_blocks_challenge_until_replaced(self):
+        """界面与结算接口同时拒绝证据已删除的分工，补证据后才可结算。"""
+        challenge_id = self.create_challenge().data["id"]
+        for user, role, evidence in (
+            (self.owner, "explain", self.owner_evidence), (self.friend, "reproduce", self.friend_evidence),
+        ):
+            TeamChallengeEntry.objects.create(challenge_id=challenge_id, user=user, role=role, evidence=evidence, summary="有据可查")
+        self.friend_evidence.delete()
+        self.assertFalse(self.client.get(f"/api/team-challenges/{challenge_id}/").data["can_complete"])
+        self.assertEqual(self.client.post(f"/api/team-challenges/{challenge_id}/complete/").status_code, 400)
+        self.assertFalse(Contribution.objects.filter(kind=Contribution.Kind.CHALLENGE).exists())
+        replacement = Evidence.objects.create(progress=self.friend_progress, kind="test", title="补充", content="通过")
+        self.client.force_authenticate(self.friend)
+        self.assertEqual(self.client.post(f"/api/team-challenges/{challenge_id}/contribute/", {
+            "role": "reproduce", "evidence": replacement.id, "summary": "更新复现记录",
+        }).status_code, 200)
+        self.assertEqual(self.client.post(f"/api/team-challenges/{challenge_id}/complete/").status_code, 200)
+
+    def test_other_route_completions_do_not_fulfill_weekly_contract(self):
+        """个人总完成数与契约路线完成数分别展示，不能跨路线兑现目标。"""
+        other_plan = LearningPlan.objects.create(slug="other-contract", title="另一条", summary="目标", total_days=1)
+        other_enrollment = Enrollment.objects.create(user=self.owner, plan=other_plan)
+        WeeklyContract.objects.create(group=self.group, user=self.owner, enrollment=other_enrollment, target_days=1)
+        self.client.force_authenticate(self.owner)
+        card = self.client.get(f"/api/study-groups/{self.group.id}/result-card/").data
+        dashboard = self.client.get(f"/api/study-groups/{self.group.id}/dashboard/").data
+        self.assertEqual(card["completed_days"], 1)
+        self.assertEqual(card["contract_completed_days"], 0)
+        self.assertFalse(card["goal_met"])
+        self.assertEqual(next(m for m in dashboard["members"] if m["id"] == self.owner.id)["completed_days"], 0)
+
+
+    def test_team_members_can_read_only_the_contributed_evidence(self):
+        """成员可读选中证据及签名附件，非成员和退出成员不能获取详情。"""
+        challenge_id = self.create_challenge().data["id"]
+        Evidence.objects.create(progress=self.owner_progress, kind="note", title="未分享的私人笔记", content="PRIVATE_UNSHARED")
+        with tempfile.TemporaryDirectory() as directory, override_settings(MEDIA_ROOT=directory):
+            self.owner_evidence.attachment.save("proof.txt", SimpleUploadedFile("proof.txt", b"shared proof"))
+            submitted = self.client.post(f"/api/team-challenges/{challenge_id}/contribute/", {
+                "role": "explain", "evidence": self.owner_evidence.id, "summary": "先复制外层列表，再修改副本。",
+            })
+            self.assertEqual(submitted.status_code, 201, submitted.data)
+            self.client.force_authenticate(self.friend)
+            response = self.client.get(f"/api/team-challenges/{challenge_id}/")
+            entry = response.data["entries"][0]
+            self.assertEqual(entry["summary"], "先复制外层列表，再修改副本。")
+            self.assertEqual(entry["evidence_detail"]["content"], self.owner_evidence.content)
+            self.assertNotIn("is_featured", entry["evidence_detail"])
+            self.assertNotIn("PRIVATE_UNSHARED", str(response.data))
+            attachment_path = urlparse(entry["evidence_detail"]["attachment_url"]).path
+            file_response = self.client.get(attachment_path)
+            self.assertEqual(file_response.status_code, 200)
+            self.assertEqual(file_response["X-Accel-Redirect"], f"/protected-media/{self.owner_evidence.attachment.name}")
+            file_response.close()
+            # 测试不启动 Nginx，开发模式另行验证相同签名对应的真实文件内容。
+            with override_settings(DEBUG=True):
+                file_response = self.client.get(attachment_path)
+                try:
+                    self.assertEqual(b"".join(file_response.streaming_content), b"shared proof")
+                finally:
+                    file_response.close()
+            self.group.members.remove(self.friend)
+            self.assertEqual(self.client.get(f"/api/team-challenges/{challenge_id}/").status_code, 404)
+            self.client.force_authenticate(self.outsider)
+            self.assertEqual(self.client.get(f"/api/team-challenges/{challenge_id}/").status_code, 404)
+
+
+class LearningPracticeTests(TestCase):
+    """覆盖首批客观复习、实验、短时保存和私人成果展示的完整数据边界。"""
+
+    def setUp(self):
+        """创建一条与已审核主题一致且已经到期的本人进度。"""
+        self.user = User.objects.create_user(username="practice-user")
+        self.other = User.objects.create_user(username="practice-other")
+        self.plan = LearningPlan.objects.create(slug="python-foundation-60d", title="Python", summary="练习", total_days=2)
+        self.day = PlanDay.objects.create(
+            plan=self.plan, day_number=2, phase="基础", week_number=1, week_title="基础", title="变量与对象",
+            core_knowledge=PRACTICE[(self.plan.slug, 2)]["topic"], hands_on_task="解释变量绑定", acceptance_criteria=["保留证据"],
+        )
+        self.enrollment = Enrollment.objects.create(user=self.user, plan=self.plan, current_day=2)
+        self.progress = DayProgress.objects.create(
+            enrollment=self.enrollment, plan_day=self.day, status="completed", completed_at=timezone.now() - timedelta(days=4),
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+
+    def test_quiz_is_server_graded_and_snapshots_survive_reloading(self):
+        """逐个验证全错、部分正确、全对，客户端伪造评级不影响间隔和判分。"""
+        questions = PRACTICE[(self.plan.slug, 2)]["questions"]
+        for correct_count, rating in ((0, "forgot"), (1, "unsure"), (3, "mastered")):
+            with self.subTest(correct_count=correct_count):
+                quiz = self.client.get("/api/reviews/").data["reviews"]["due"][0]["quiz"]
+                self.assertTrue(all("answer" not in q and "explanation" not in q for q in quiz["questions"]))
+                answers = {q["id"]: q["answer"] if i < correct_count else (q["answer"] + 1) % len(q["options"]) for i, q in enumerate(questions)}
+                result = self.client.post("/api/reviews/", {
+                    "progress": self.progress.id, "answers": answers, "quiz_token": quiz["token"], "rating": "mastered",
+                    "quiz_results": [{"correct": True}],
+                }, format="json")
+                self.assertEqual(result.status_code, 201, result.data)
+                self.assertEqual(result.data["attempt"]["rating"], rating)
+                self.assertEqual(sum(r["correct"] for r in result.data["attempt"]["quiz_results"]), correct_count)
+                self.assertEqual(result.data["attempt"]["interval_days"], {"forgot": 1, "unsure": 3, "mastered": 7}[rating])
+                reloaded = self.client.get("/api/reviews/").data["reviews"]["upcoming"][0]
+                self.assertEqual(reloaded["latest_results"], result.data["attempt"]["quiz_results"])
+                self.assertEqual(self.client.post("/api/reviews/", {"progress": self.progress.id, "rating": "mastered"}).status_code, 400)
+                ReviewAttempt.objects.filter(progress=self.progress).update(next_review_at=timezone.now() - timedelta(seconds=1))
+
+    def test_quiz_rejects_missing_stale_invalid_and_foreign_submissions(self):
+        """无效选项、旧题版本、漏答及越权均不能产生复习记录。"""
+        quiz = review_quiz(self.day)
+        valid = {q["id"]: 0 for q in quiz["questions"]}
+        for answers, token in (({}, quiz["token"]), (valid, "stale"), ({**valid, next(iter(valid)): True}, quiz["token"]), ({**valid, next(iter(valid)): 99}, quiz["token"]), (None, None)):
+            with self.subTest(answers=answers, token=token):
+                response = self.client.post("/api/reviews/", {"progress": self.progress.id, "answers": answers, "quiz_token": token, "rating": "mastered"}, format="json")
+                self.assertEqual(response.status_code, 400)
+        self.client.force_authenticate(self.other)
+        self.assertEqual(self.client.post("/api/reviews/", {"progress": self.progress.id, "answers": valid, "quiz_token": quiz["token"]}, format="json").status_code, 400)
+        self.assertFalse(ReviewAttempt.objects.exists())
+
+    def test_short_session_saves_resume_note_without_completing_day(self):
+        """保存接续提示不会完成当日或推进路线，长度限制由服务端执行。"""
+        self.progress.status = DayProgress.Status.IN_PROGRESS
+        self.progress.save(update_fields=["status"])
+        response = self.client.patch(f"/api/progress/{self.progress.id}/", {"resume_note": "下次补空列表样例"})
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(self.client.get(f"/api/progress/{self.progress.id}/").data["resume_note"], "下次补空列表样例")
+        self.progress.refresh_from_db()
+        self.enrollment.refresh_from_db()
+        self.assertEqual(self.progress.status, DayProgress.Status.IN_PROGRESS)
+        self.assertEqual(self.enrollment.current_day, 2)
+        self.assertEqual(self.client.patch(f"/api/progress/{self.progress.id}/", {"resume_note": "长" * 501}).status_code, 400)
+
+    def test_showcase_is_private_and_verifying_gaps_are_not_resolved(self):
+        """精选不发布社区内容，越权精选失败，待验证缺口仍计入未解决。"""
+        evidence = Evidence.objects.create(progress=self.progress, title="我的作品", content="私人证据", kind="note")
+        Gap.objects.create(progress=self.progress, title="边界不清", status="verifying")
+        self.assertEqual(self.client.post(f"/api/evidence/{evidence.id}/feature/", {"is_featured": "yes"}, format="json").status_code, 400)
+        self.assertEqual(self.client.post(f"/api/evidence/{evidence.id}/feature/", {"is_featured": True}, format="json").status_code, 200)
+        insights = self.client.get("/api/insights/").data
+        self.assertEqual(insights["showcase"][0]["id"], evidence.id)
+        self.assertEqual(insights["summary"]["open_gaps"], 1)
+        self.assertEqual(insights["repeated_gaps"][0]["open_count"], 1)
+        self.assertFalse(CommunityPost.objects.exists())
+        self.client.force_authenticate(self.other)
+        self.assertEqual(self.client.get("/api/insights/").data["showcase"], [])
+        self.assertEqual(self.client.post(f"/api/evidence/{evidence.id}/feature/", {"is_featured": False}, format="json").status_code, 404)
+
+    def test_fixed_practice_matches_catalog_and_labs_fail_then_pass(self):
+        """检查题库绑定未漂移，三个受信任实验的原始代码失败、参考修复通过。"""
+        replacements = {
+            "shared-list": ("result = items", "result = items.copy()"),
+            "decimal-total": ("Decimal(sum(float(value) for value in values))", "sum((Decimal(value) for value in values), Decimal('0'))"),
+            "missing-endpoint": ("range(1, n)", "range(1, n + 1)"),
+        }
+        for (slug, number), practice in PRACTICE.items():
+            with self.subTest(slug=slug, day=number):
+                plan = next(p for p in SYSTEM_ROADMAPS if p["slug"] == slug)
+                day = SimpleNamespace(plan=SimpleNamespace(slug=slug), day_number=number, core_knowledge=plan["days"][number - 1]["core_knowledge"])
+                self.assertEqual(practice_for(day), practice)
+                if lab := practice.get("lab"):
+                    # 只执行仓库维护的固定样例，不运行用户提交内容。
+                    with self.assertRaises(AssertionError):
+                        exec(compile(lab["starter"] + "\n" + lab["checks"], lab["id"], "exec"), {})
+                    before, after = replacements[lab["id"]]
+                    exec(compile(lab["starter"].replace(before, after) + "\n" + lab["checks"], lab["id"], "exec"), {})
+                day.core_knowledge = "课程已经改编"
+                self.assertEqual(practice_for(day), {})
+
+    def test_unknown_custom_subject_uses_neutral_content(self):
+        """绘画等未识别主题不能自动配上 Python 示例或编程验收要求。"""
+        content = build_lesson_content(1, "色彩与构图", "画一张静物素描", ["保留草图"], "custom-painting")
+        detail = content["knowledge_details"][0]
+        self.assertEqual(detail["language"], "text")
+        self.assertNotIn("python", json.dumps(content).lower())
+        self.assertNotIn("运行命令", detail["implementation_requirement"])
+        self.assertIn("色彩与构图", detail["reference_code"])
+
+    def test_export_preserves_new_fields_and_all_review_snapshots(self):
+        """JSON 与 Markdown 均保留本人的接续、精选和历次作答，不带入其他账号记录。"""
+        self.progress.resume_note = "接着验证嵌套列表"
+        self.progress.save(update_fields=["resume_note"])
+        Evidence.objects.create(progress=self.progress, kind="link", title="精选作品", url="https://example.com/work", is_featured=True)
+        snapshot = [{"id": "q1", "prompt": "两个名字指向什么？", "selected": "同一个对象", "expected": "同一个对象", "correct": True, "explanation": "赋值不会复制对象。"}]
+        for note in ("第一次回忆", "第二次回忆"):
+            ReviewAttempt.objects.create(progress=self.progress, rating="mastered", note=note, quiz_results=snapshot, interval_days=7, next_review_at=timezone.now()+timedelta(days=7))
+        other_enrollment = Enrollment.objects.create(user=self.other, plan=self.plan)
+        DayProgress.objects.create(enrollment=other_enrollment, plan_day=self.day, resume_note="PRIVATE_OTHER")
+        response = self.client.get("/api/insights/export/?type=json")
+        day = json.loads(response.data["content"])["learning_records"][0]["days"][0]
+        self.assertEqual(day["resume_note"], self.progress.resume_note)
+        self.assertTrue(day["evidence"][0]["is_featured"])
+        self.assertEqual(len(day["reviews"]), 2)
+        self.assertEqual(day["reviews"][0]["quiz_results"], snapshot)
+        markdown = self.client.get("/api/insights/export/?type=markdown").data["content"]
+        for text in (self.progress.resume_note, "展柜精选", "第一次回忆", "第二次回忆", "赋值不会复制对象。", "同一个对象"):
+            self.assertIn(text, markdown)
+        self.assertNotIn("PRIVATE_OTHER", response.data["content"] + markdown)
+
+    def test_review_queue_queries_do_not_grow_per_day(self):
+        """题库读取已预加载的路线，增加到期学习日不会增加查询次数。"""
+        with self.assertNumQueries(3):
+            self.assertEqual(review_center(self.user)["due_count"], 1)
+        self.plan.total_days = 6
+        self.plan.save(update_fields=["total_days"])
+        for number in range(3, 7):
+            day = PlanDay.objects.create(plan=self.plan, day_number=number, phase="基础", week_number=1, week_title="基础", title="练习", core_knowledge="主题", hands_on_task="实验", acceptance_criteria=["核对"])
+            DayProgress.objects.create(enrollment=self.enrollment, plan_day=day, status="completed", completed_at=timezone.now()-timedelta(days=4))
+        with self.assertNumQueries(3):
+            self.assertEqual(review_center(self.user)["due_count"], 5)

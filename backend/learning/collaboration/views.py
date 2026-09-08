@@ -181,12 +181,12 @@ class StudyGroupViewSet(
         start_at = timezone.make_aware(datetime.combine(week_start, time.min))
         end_at = start_at + timedelta(days=7)
         user = request.user
-        completed_days = DayProgress.objects.filter(
+        completed_progress = DayProgress.objects.filter(
             enrollment__user=user,
             status=DayProgress.Status.COMPLETED,
             completed_at__gte=start_at,
             completed_at__lt=end_at,
-        ).count()
+        )
         evidence_count = Evidence.objects.filter(
             progress__enrollment__user=user, created_at__gte=start_at, created_at__lt=end_at
         ).count()
@@ -210,14 +210,16 @@ class StudyGroupViewSet(
             challenge__completed_at__lt=end_at,
         ).count()
         contract = group.contracts.filter(user=user, week_start=week_start).first()
+        contract_completed = completed_progress.filter(enrollment=contract.enrollment).count() if contract else 0
         return Response({
             "group_name": group.name,
             "user_name": user.first_name or user.username,
             "week_start": week_start,
             "week_end": week_end,
             "target_days": contract.target_days if contract else None,
-            "completed_days": completed_days,
-            "goal_met": bool(contract and completed_days >= contract.target_days),
+            "completed_days": completed_progress.count(),
+            "contract_completed_days": contract_completed,
+            "goal_met": bool(contract and contract_completed >= contract.target_days),
             "evidence_count": evidence_count,
             "resolved_gaps": resolved_gaps,
             "peer_reviews": peer_reviews,
@@ -310,11 +312,11 @@ class TeamChallengeViewSet(
         """在至少两名成员完成不同分工后合并挑战并记录成长贡献。"""
         with transaction.atomic():
             challenge = TeamChallenge.objects.select_for_update().get(pk=self.get_object().pk)
-            if challenge.status != TeamChallenge.Status.OPEN:
-                return Response({"detail": "该挑战已经完成。"}, status=400)
-            entries = list(challenge.entries.select_related("user"))
-            if len(entries) < 2:
-                return Response({"detail": "至少需要两名成员完成不同分工后才能合并挑战。"}, status=400)
+            # 锁住分工行，让删除证据时的 SET_NULL 与结算按顺序执行。
+            entries = list(challenge.entries.select_for_update().select_related("user"))
+            errors = challenge.completion_errors(entries)
+            if errors:
+                return Response({"detail": errors}, status=400)
             challenge.status = TeamChallenge.Status.COMPLETED
             challenge.completed_at = timezone.now()
             challenge.save(update_fields=["status", "completed_at"])

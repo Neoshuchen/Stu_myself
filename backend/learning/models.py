@@ -150,6 +150,8 @@ class PlanFeedback(models.Model):
 
 
 class DayProgress(models.Model):
+    """保存单日学习检查项、接续提示和实际完成状态。"""
+
     class Status(models.TextChoices):
         NOT_STARTED = "not_started", "未开始"
         IN_PROGRESS = "in_progress", "进行中"
@@ -161,6 +163,7 @@ class DayProgress(models.Model):
     acceptance_checks = models.JSONField(default=list, blank=True)
     knowledge_checks = models.JSONField(default=list, blank=True)
     reflection = models.TextField(blank=True)
+    resume_note = models.CharField(max_length=500, blank=True)
     recall_score = models.PositiveSmallIntegerField(
         null=True, blank=True, validators=[MinValueValidator(0), MaxValueValidator(100)]
     )
@@ -210,6 +213,7 @@ class ReviewAttempt(models.Model):
     progress = models.ForeignKey(DayProgress, related_name="review_attempts", on_delete=models.CASCADE)
     rating = models.CharField(max_length=12, choices=Rating.choices)
     note = models.TextField(blank=True)
+    quiz_results = models.JSONField(default=list, blank=True)
     interval_days = models.PositiveSmallIntegerField(
         validators=[MinValueValidator(1), MaxValueValidator(30)]
     )
@@ -239,6 +243,8 @@ def evidence_upload_path(instance, filename):
 
 
 class Evidence(models.Model):
+    """保存个人学习证据及是否选入私人成果展柜。"""
+
     class Kind(models.TextChoices):
         COMMIT = "commit", "Git提交"
         CODE = "code", "代码"
@@ -254,6 +260,7 @@ class Evidence(models.Model):
     content = models.TextField(blank=True)
     url = models.URLField(blank=True)
     attachment = models.FileField(upload_to=evidence_upload_path, blank=True)
+    is_featured = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -565,6 +572,18 @@ class TeamChallenge(models.Model):
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.OPEN)
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
+
+    def completion_errors(self, entries=None):
+        """校验传入的分工记录（默认读取全部），返回阻止结算的原因列表。"""
+        entries = list(self.entries.all()) if entries is None else entries
+        if self.status != self.Status.OPEN:
+            return ["该挑战已经完成。"]
+        if len(entries) < 2:
+            return ["至少需要两名成员完成不同分工后才能合并挑战。"]
+        # 删除证据会把外键置空，已有分工不能因此继续满足结算条件。
+        if any(entry.evidence_id is None for entry in entries):
+            return ["有成员的学习证据已删除，请重新提交有效证据。"]
+        return []
 
     class Meta:
         ordering = ["status", "deadline", "-created_at"]

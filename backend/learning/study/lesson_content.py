@@ -39,6 +39,16 @@ def detail(
 
 
 TRACK_GUIDES = {
+    "general": {
+        "basic": "先用自己的话定义主题，结合一个具体情境说明它解决什么问题，并区分事实与推测。",
+        "mechanism": "从目标出发，记录行动、观察结果与判断依据，再核对验收条件。",
+        "tools": ["练习记录", "课程提供的材料"],
+        "pitfalls": ["只有结论，没有可核对的过程或证据"],
+        "language": "text",
+        "command": "按模板完成一次练习并核对验收条件",
+        "code": "主题：{point}\n目标：\n我的做法：\n观察结果：\n判断依据：\n仍不确定的地方：\n下一步：",
+        "resources": [],
+    },
     "agent": {
         "label": "Agent 工程实践",
         "summary": "把模型调用、工具、状态和终止条件组成可观测、可测试的执行闭环，而不是把多轮提示词误当成智能体。",
@@ -588,7 +598,7 @@ def daily_mechanism(point, task, criteria, guide, teaching_example):
 def daily_pitfalls(kind, point, task, criteria, guide):
     """返回与当天任务和验收条件绑定的常见失败方式。"""
     evidence = criteria[0] if criteria else "产物可由他人复现"
-    if kind in LIFESTYLE_TRACKS:
+    if kind in LIFESTYLE_TRACKS or kind == "general":
         return [
             f"只记住“{point}”的名称，未区分可核对事实、个人判断和下一步行动",
             f"完成“{task}”时使用真实敏感数据，或在资料不足时把猜测写成结论",
@@ -605,7 +615,7 @@ def daily_pitfalls(kind, point, task, criteria, guide):
 def daily_practice_steps(kind, point, task, criteria, run_command):
     """把课程的固定学习节奏具体化为当天可执行步骤。"""
     checks = "；".join(criteria[:2]) if criteria else "结果可复现"
-    if kind in LIFESTYLE_TRACKS:
+    if kind in LIFESTYLE_TRACKS or kind == "general":
         return [
             f"用自己的话说明“{point}”适用的情境、判断依据和停止条件",
             f"使用脱敏记录或离线案例，按“{run_command}”完成一次引导练习",
@@ -621,6 +631,7 @@ def daily_practice_steps(kind, point, task, criteria, run_command):
 
 
 def track_key(track, point, task):
+    """按路线或明确主题返回讲解分类，无法识别时使用通用练习模板。"""
     if track in TRACK_GUIDES:
         return track
     if track == "coding-agent-tools-60d":
@@ -654,7 +665,9 @@ def track_key(track, point, task):
         return "javascript"
     if any(word in text for word in ("http", "爬虫", "采集", "scrapy", "requests", "xpath", "css选择器", "cookie", "代理")):
         return "crawler"
-    return "python"
+    if any(word in text for word in ("python", "pip", "pytest", "venv", "decimal")):
+        return "python"
+    return "general"
 
 
 def contextual_detail(point, task, criteria, track=""):
@@ -669,19 +682,21 @@ def contextual_detail(point, task, criteria, track=""):
     Returns:
         可直接写入课程正文的知识详情字典。
     """
-    guide = TRACK_GUIDES[track_key(track, point, task)]
-    kind = track_kind(track)
+    guide_key = track_key(track, point, task)
+    guide = TRACK_GUIDES[guide_key]
+    kind = track_kind(track) or ("general" if guide_key == "general" else "")
     if kind == "accelerated":
         kind = infer_accelerated_kind(f"{point} {task}")
-    teaching_example = example_for(kind, point) if kind else None
-    concepts = concept_notes(kind, point) if kind else []
+    teaching_example = example_for(kind, point) if kind and kind != "general" else None
+    # 专题讲义只支持已登记学科，通用主题直接采用中性练习模板。
+    concepts = concept_notes(kind, point) if kind and kind != "general" else []
     # 所有经审核的概念都进入正文，不能因合并日主题较多而静默丢掉第三项后的解释。
     teaching_note = " ".join(item["explanation"] for item in concepts) if concepts else guide["basic"]
     resources = relevant_resources(kind, point, guide["resources"])
     point_json = repr(point).replace("'", '"')
     code = teaching_example["code"] if teaching_example else guide["code"].format(point=point, point_json=point_json)
     expected = list(criteria) or ["产物可由他人复现", "结论与证据能够相互对应"]
-    if kind in LIFESTYLE_TRACKS:
+    if kind in LIFESTYLE_TRACKS or kind == "general":
         summary = f"今天聚焦“{point}”，通过“{task}”形成可核对、可复盘的日常能力。"
         requirement = f"先独立完成“{task}”；使用脱敏记录、虚拟案例或低风险场景，保留常规情境、边界或失败情境、判断依据与复盘。"
         expected += ["边界或失败情境能稳定呈现且处理理由可解释", "练习表、判断证据、安全边界与复盘已保存"]
@@ -715,6 +730,8 @@ def contextual_detail(point, task, criteria, track=""):
         practice_steps,
     )
     item["code_explanation"] = teaching_example["explanation"] if teaching_example else ["先辨认示例输入与预期输出。", "替换成当天任务数据，并增加失败输入验证边界。"]
+    if kind == "general":
+        item["code_explanation"] = ["模板用于记录练习过程，不代表已验证的结论。", "先完成任务，再用实际结果核对验收条件。"]
     item["what_it_solves"] = f"帮助你在“{task}”中正确使用“{point}”，并用“{expected[0]}”判断结果是否成立。"
     return item
 
@@ -754,8 +771,8 @@ def build_lesson_content(day_number, core_knowledge, task, criteria, track=""):
     teaching = build_teaching_sections(day_number, core_knowledge, task, criteria, kind) if kind else {
         "workflow": [
             {"title": "闭卷回忆", "body": f"先不查资料，写下你对“{core_knowledge}”的理解、适用范围和一个仍不确定的问题。"},
-            {"title": "独立复现", "body": f"围绕“{task}”先独立完成最小实现或实验，再打开知识详情核对参考实现。"},
-            {"title": "保存证据", "body": "记录输入、输出、错误路径、环境版本和中间产物。"},
+            {"title": "独立复现", "body": f"围绕“{task}”先独立完成一次练习，再打开知识详情核对方法与结果。"},
+            {"title": "保存证据", "body": "记录目标、实际步骤、观察结果、判断依据和仍不确定的边界。"},
         ]
     }
     return {

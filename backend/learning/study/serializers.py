@@ -22,6 +22,7 @@ from ..models import (
 from ..system.media import normalize_image, protected_media_url
 from .experience import record_review, review_due_at
 from .lesson_content import build_lesson_content, split_knowledge_points
+from .practice import grade_review, practice_for, review_quiz
 
 
 class PlanDaySummarySerializer(serializers.ModelSerializer):
@@ -38,6 +39,7 @@ class PlanDaySerializer(serializers.ModelSerializer):
     knowledge_points = serializers.SerializerMethodField()
     knowledge_details = serializers.SerializerMethodField()
     plan_slug = serializers.CharField(source="plan.slug", read_only=True)
+    lab = serializers.SerializerMethodField()
 
     class Meta:
         model = PlanDay
@@ -59,6 +61,7 @@ class PlanDaySerializer(serializers.ModelSerializer):
             "reference_answer",
             "commands",
             "community_supplements",
+            "lab",
         )
 
     def get_knowledge_points(self, obj):
@@ -66,6 +69,10 @@ class PlanDaySerializer(serializers.ModelSerializer):
 
     def get_knowledge_details(self, obj):
         return obj.knowledge_details()
+
+    def get_lab(self, obj):
+        """返回与当前主题匹配的固定离线实验，没有实验时返回 null。"""
+        return practice_for(obj).get("lab")
 
 
 class LearningPlanListSerializer(serializers.ModelSerializer):
@@ -367,9 +374,9 @@ class EvidenceSerializer(serializers.ModelSerializer):
         model = Evidence
         fields = (
             "id", "progress", "kind", "title", "content", "url", "attachment",
-            "attachment_url", "attachment_name", "attachment_is_image", "created_at",
+            "attachment_url", "attachment_name", "attachment_is_image", "created_at", "is_featured",
         )
-        read_only_fields = ("id", "attachment_url", "attachment_name", "attachment_is_image", "created_at")
+        read_only_fields = ("id", "attachment_url", "attachment_name", "attachment_is_image", "created_at", "is_featured")
         extra_kwargs = {"progress": {"write_only": True}, "attachment": {"write_only": True}}
 
     def validate_attachment(self, value):
@@ -459,6 +466,7 @@ class DayProgressSerializer(serializers.ModelSerializer):
             "acceptance_checks",
             "knowledge_checks",
             "reflection",
+            "resume_note",
             "recall_score",
             "started_at",
             "completed_at",
@@ -558,17 +566,21 @@ class ReviewAttemptSerializer(serializers.ModelSerializer):
 
     progress = serializers.PrimaryKeyRelatedField(queryset=DayProgress.objects.none())
     rating_label = serializers.CharField(source="get_rating_display", read_only=True)
+    answers = serializers.JSONField(write_only=True, required=False)
+    quiz_token = serializers.CharField(write_only=True, required=False, max_length=64)
 
     class Meta:
         model = ReviewAttempt
         fields = (
             "id", "progress", "rating", "rating_label", "note",
             "interval_days", "reviewed_at", "next_review_at",
+            "answers", "quiz_token", "quiz_results",
         )
         read_only_fields = (
             "id", "rating_label", "interval_days", "reviewed_at", "next_review_at",
+            "quiz_results",
         )
-        extra_kwargs = {"note": {"max_length": 4000}}
+        extra_kwargs = {"note": {"max_length": 4000}, "rating": {"required": False}}
 
     def __init__(self, *args, **kwargs):
         """把可选学习日限制为当前登录用户自己的已完成记录。"""
@@ -584,6 +596,22 @@ class ReviewAttemptSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """按掌握结果计算新间隔并写入复习记录。"""
         return record_review(**validated_data)
+
+    def validate(self, attrs):
+        """客观题由服务端判分，无题目的学习日继续接收人工闭卷自评。"""
+        day = attrs["progress"].plan_day
+        answers = attrs.pop("answers", None)
+        token = attrs.pop("quiz_token", None)
+        if review_quiz(day):
+            try:
+                attrs["rating"], attrs["quiz_results"] = grade_review(day, answers, token)
+            except ValueError as exc:
+                raise serializers.ValidationError({"answers": str(exc)}) from exc
+        elif answers is not None or token is not None:
+            raise serializers.ValidationError("当前学习日没有客观题，请刷新后进行闭卷自评。")
+        elif not attrs.get("rating"):
+            raise serializers.ValidationError({"rating": "请选择本次闭卷掌握情况。"})
+        return attrs
 
     def validate_progress(self, value):
         """只接受已经进入到期队列的学习日，防止重复刷取复习经验。"""

@@ -454,9 +454,9 @@ pre, code { font-family: var(--font-mono); }
 .evidence-item a { display: inline-block; margin-top: 5px; color: var(--accent); font-size: 10px; }
 .evidence-item img { display: block; width: 100%; max-height: 160px; margin-top: 7px; object-fit: cover; border-radius: 8px; }
 .mini-form { display: grid; gap: 8px; }
-.mini-form input, .mini-form textarea, .mini-form select, .form-stack input { width: 100%; padding: 10px 11px; color: var(--ink); background: var(--surface-strong); border: 1px solid var(--line-strong); border-radius: 12px; outline: none; font-size: 10px; }
+.mini-form input, .mini-form textarea, .mini-form select, .form-stack input, .short-study textarea, .short-study select, .ai-focus-preview input, .ai-focus-preview textarea { width: 100%; padding: 10px 11px; color: var(--ink); background: var(--surface-strong); border: 1px solid var(--line-strong); border-radius: 12px; outline: none; font-size: 10px; }
 .mini-form input::placeholder, .mini-form textarea::placeholder, .form-stack input::placeholder { color: color-mix(in srgb, var(--muted) 84%, transparent); }
-.mini-form input:focus, .mini-form textarea:focus, .mini-form select:focus, .form-stack input:focus, .reflection-box textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
+.mini-form input:focus, .mini-form textarea:focus, .mini-form select:focus, .form-stack input:focus, .reflection-box textarea:focus, .short-study textarea:focus, .short-study select:focus, .ai-focus-preview input:focus, .ai-focus-preview textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
 .mini-form textarea { resize: vertical; }
 .form-pair { display: grid; grid-template-columns: 105px 1fr; gap: 7px; }
 .file-input input { position: absolute; width: 1px; height: 1px; opacity: 0; }
@@ -1081,7 +1081,8 @@ pre, code { font-family: var(--font-mono); }
 .challenge-list header > strong { color: var(--accent); font-size: 11px; }
 .challenge-list > article > p { margin: 0; color: var(--ink-soft); font-size: 13px; }
 .challenge-entries { display: flex; flex-wrap: wrap; gap: 8px; }
-.challenge-entries span { padding: 7px 10px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 99px; font-size: 10px; }
+.challenge-entries article { width: 100%; min-width: 0; padding: 14px; color: var(--ink-soft); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow-wrap: anywhere; }
+.challenge-entries a { display: block; margin-top: 8px; }
 .challenge-entries b { margin-right: 5px; color: var(--accent); }
 .challenge-entry-form { display: grid; grid-template-columns: minmax(130px, .7fr) minmax(220px, 1.3fr); gap: 12px; align-items: end; }
 .challenge-entry-form .challenge-summary { grid-column: 1 / -1; }
@@ -1229,7 +1230,8 @@ pre, code { font-family: var(--font-mono); }
   .ai-tutor-topbar { padding: 11px 12px 10px 16px; }
   .ai-tutor-topbar .eyebrow { display: none; }
   .ai-tutor-topbar h2 { max-width: 175px; font-size: 15px; }
-  .ai-mobile-session-select { width: 108px; display: block; padding: 8px; font-size: 9px; }
+  /* 覆盖抽屉 select 的通用全宽规则，长会话标题不能把关闭按钮挤出屏幕。 */
+  .ai-tutor-drawer .ai-mobile-session-select { width: 108px; display: block; padding: 8px; font-size: 9px; }
   .ai-topbar-actions { gap: 2px; }
   .ai-topbar-actions > button { width: 32px; height: 32px; }
   .ai-connection-form { padding: 20px 16px 28px; }
@@ -1315,3 +1317,25 @@ pre, code { font-family: var(--font-mono); }
 .knowledge-card > div span, .knowledge-card > div i { font-size: 12px; }
 .knowledge-card p { font-size: 13px; line-height: 1.65; }
 .knowledge-card button { min-height: 34px; font-size: 13px; }
+
+/* 学习增强沿用现有面板与表单，窄屏保持单列和可点击的选项。 */
+.short-study, .detective-lab, .showcase-section, .quiz-feedback { margin-bottom: 24px; }
+.short-study > label, .ai-focus-preview label { display: grid; gap: 8px; margin: 14px 0; }
+.short-study > .button { margin: 12px 12px 0 0; }
+.short-study .section-title { flex-wrap: wrap; gap: 12px; }
+.short-study small { display: block; color: var(--muted); }
+.detective-lab details, .showcase-grid details { margin-top: 16px; }
+.detective-lab li { margin: 8px 0; }
+.recall-quiz fieldset { border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin: 16px 0; min-width: 0; }
+.recall-quiz legend { padding: 0 6px; font-weight: 600; }
+.recall-quiz label { display: flex; align-items: baseline; gap: 12px; padding: 10px 0; cursor: pointer; }
+.recall-quiz input { width: auto; flex: 0 0 auto; }
+.quiz-feedback article { padding: 12px 0; border-top: 1px solid var(--line); }
+.showcase-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 24px; }
+.showcase-grid article { min-width: 0; border-top: 1px solid var(--line); padding-top: 18px; overflow-wrap: anywhere; }
+.showcase-grid img { display: block; max-width: 100%; max-height: 260px; object-fit: contain; margin: 12px 0; }
+.showcase-grid .button-row { margin-top: 18px; flex-wrap: wrap; }
+.ai-focus-preview { max-height: 240px; overflow: auto; padding: 12px; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 12px; }
+.ai-focus-preview :is(input, textarea) { width: 100%; font-size: 13px; }
+.challenge-board > .button { margin-bottom: 16px; }
+.challenge-list > article > p { white-space: pre-wrap; }
