@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { api } from '../api'
+import { useUnsavedChanges } from '../useUnsavedChanges'
 import AppShell from '../components/AppShell.vue'
 import LoadingState from '../components/LoadingState.vue'
 
@@ -20,6 +21,9 @@ const editing = computed(() => Boolean(route.params.id))
 const fixedPlan = computed(() => Boolean(route.params.slug))
 const loading = ref(editing.value || fixedPlan.value)
 const availableDays = computed(() => selectedPlan.value?.days || [])
+const savedForm = ref(JSON.stringify(form.value))
+const dirty = computed(() => JSON.stringify(form.value) !== savedForm.value || imageFiles.value.length > 0 || removedImageIds.value.length > 0)
+useUnsavedChanges(dirty)
 
 onMounted(async () => {
   try {
@@ -39,12 +43,14 @@ onMounted(async () => {
       if (!post.owned) return router.replace(`/community/posts/${post.id}`)
       form.value = { post_type: post.post_type, title: post.title, content: post.content, plan: post.plan, plan_day: post.plan_day }
       existingImages.value = post.images || []
+      savedForm.value = JSON.stringify(form.value)
       if (post.plan_slug) selectedPlan.value = await api(`/plans/${post.plan_slug}/`)
     }
     const day = Number(route.query.day)
     if (day && selectedPlan.value) form.value.plan_day = selectedPlan.value.days.find((item) => item.day_number === day)?.id || null
     if (route.query.type) form.value.post_type = route.query.type
     if (route.query.content) form.value.content = String(route.query.content)
+    if (!editing.value) savedForm.value = JSON.stringify({ ...form.value, title: '', content: '' })
   } catch (err) { error.value = err.message } finally { loading.value = false }
 })
 
@@ -68,9 +74,11 @@ function removeExistingImage(id) {
   if (!removedImageIds.value.includes(id)) removedImageIds.value.push(id)
 }
 
+/** 提交当前帖子及图片；成功后更新保存基线并跳转，失败保留草稿，无参数和返回值。 */
 async function submit() {
   busy.value = true
   error.value = ''
+  const submitted = JSON.stringify(form.value)
   try {
     const payload = new FormData()
     payload.append('post_type', form.value.post_type)
@@ -83,6 +91,9 @@ async function submit() {
     const post = await api(editing.value ? `/community/posts/${route.params.id}/` : '/community/posts/', {
       method: editing.value ? 'PATCH' : 'POST', body: payload,
     })
+    savedForm.value = submitted
+    imageFiles.value = []
+    removedImageIds.value = []
     router.push(`/community/posts/${post.id}`)
   } catch (err) { error.value = err.message } finally { busy.value = false }
 }
@@ -95,7 +106,7 @@ async function submit() {
       <header class="page-heading"><div><span class="eyebrow">SHARE WHAT YOU LEARNED</span><h1>{{ editing ? '继续完善这篇分享' : '把今天学到的说清楚' }}</h1><p>具体的上下文、尝试和结果，比漂亮的结论更有帮助。</p></div></header>
       <p v-if="error" class="notice error">{{ error }}</p>
       <form class="panel community-form" @submit.prevent="submit">
-        <div class="editor-fields">
+        <fieldset class="editor-fields" :disabled="busy">
           <label>内容类型<select v-model="form.post_type"><option value="share">技术分享</option><option value="question">问题求助</option><option value="check_in">学习打卡</option><option value="project">项目展示</option></select></label>
           <label v-if="!fixedPlan">发布位置<select v-model="form.plan" @change="planChanged"><option :value="null">全站技术社区</option><option v-for="plan in plans.filter((item) => item.enrolled)" :key="plan.id" :value="plan.id">{{ plan.title }}学习小组</option></select></label>
           <label v-else>发布位置<input :value="`${selectedPlan?.title || ''}学习小组`" disabled /></label>
@@ -107,7 +118,7 @@ async function submit() {
             <figure v-for="image in existingImages" v-show="!removedImageIds.includes(image.id)" :key="image.id"><img :src="image.url" :alt="image.alt_text || '帖子配图'" /><button type="button" @click="removeExistingImage(image.id)">移除</button></figure>
             <figure v-for="file in imageFiles" :key="`${file.name}-${file.lastModified}`" class="pending-image"><span>{{ file.name }}</span><small>保存后生成预览</small></figure>
           </div>
-        </div>
+        </fieldset>
         <footer class="editor-actions"><span>内容会立即发布，请确保不包含密码、Token 等隐私信息。</span><div class="button-row"><button type="button" class="button ghost" @click="router.back()">取消</button><button class="button primary" :disabled="busy">{{ busy ? '正在发布…' : editing ? '保存修改' : '发布分享' }}</button></div></footer>
       </form>
     </div>

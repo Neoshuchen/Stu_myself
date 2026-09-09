@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { api } from '../api'
+import { useUnsavedChanges } from '../useUnsavedChanges'
 import AppShell from '../components/AppShell.vue'
 import LoadingState from '../components/LoadingState.vue'
 
@@ -37,6 +38,15 @@ const generation = ref({
 const form = ref({ title: '', subtitle: '', summary: '', audience: '', days: [] })
 const editing = computed(() => Boolean(route.params.slug))
 const busy = computed(() => Boolean(savingAction.value))
+const savedForm = ref('')
+// 自动选中的模型不算用户编辑；生成目标、选中文件和路线正文都属于需要保护的输入。
+const editorSnapshot = computed(() => JSON.stringify({
+  plan: planPayload(),
+  generation: { ...generation.value, credential: undefined },
+  files: roadmapFiles.value.map(file => [file.name, file.size, file.lastModified]),
+}))
+const dirty = computed(() => importing.value || (savedForm.value !== '' && editorSnapshot.value !== savedForm.value))
+useUnsavedChanges(dirty)
 const hasCredentials = computed(() => credentials.value.length > 0)
 const canGenerate = computed(() => (
   roadmapFiles.value.length > 0
@@ -164,6 +174,7 @@ function discardPreview() {
   importNotice.value = '已放弃生成结果，可以重新生成或手工创建路线。'
 }
 
+/** 将编辑表单转换为路线 API 数据；无参数，返回可保存的路线对象。 */
 function planPayload() {
   return {
     title: form.value.title,
@@ -177,17 +188,21 @@ function planPayload() {
   }
 }
 
+/** 保存当前路线并执行所选后续操作；失败保留编辑内容，无参数和返回值。 */
 async function save() {
   const action = saveAction.value
   error.value = ''
   savingAction.value = action
   let created = null
+  const submitted = JSON.stringify(planPayload())
+  const submittedSnapshot = editorSnapshot.value
   try {
     const plan = await api(editing.value ? `/my-plans/${route.params.slug}/` : '/my-plans/', {
       method: editing.value ? 'PUT' : 'POST',
-      body: JSON.stringify(planPayload()),
+      body: submitted,
     })
     created = plan
+    savedForm.value = submittedSnapshot
     if (editing.value || action === 'draft') {
       await router.push(`/plans/${plan.slug}`)
       return
@@ -216,12 +231,14 @@ onMounted(async () => {
   window.addEventListener('ai-credentials-changed', credentialsChanged)
   if (!editing.value) {
     addDay()
+    savedForm.value = editorSnapshot.value
     await loadCredentials()
     return
   }
   try {
     const plan = await api(`/my-plans/${route.params.slug}/`)
     form.value = { ...plan, days: plan.days.map((day) => ({ ...day, acceptance_text: day.acceptance_criteria.join('\n') })) }
+    savedForm.value = editorSnapshot.value
   } catch (err) {
     error.value = err.message
   } finally {
@@ -239,7 +256,8 @@ onBeforeUnmount(() => window.removeEventListener('ai-credentials-changed', crede
       <header class="page-heading compact"><div><h1>{{ editing ? '编辑学习路线' : '创建自己的学习路线' }}</h1><p>先定义结果，再把它拆成每天可完成、可验收的任务。</p></div></header>
       <p v-if="error" class="notice error" role="alert">{{ error }}</p>
 
-      <form class="editor-form" @submit.prevent="save">
+      <form @submit.prevent="save">
+        <fieldset class="editor-form" :disabled="busy">
         <details v-if="!editing" class="editor-section roadmap-generator" open>
           <summary><span><b>AI 从 Markdown 生成</b><small>让你选择的模型梳理资料，结果先预览、修改，再决定是否采用。</small></span><i>生成设置</i></summary>
           <div class="roadmap-generator-body">
@@ -308,6 +326,7 @@ onBeforeUnmount(() => window.removeEventListener('ai-credentials-changed', crede
           </div>
           <button v-else class="button primary" :disabled="busy" @click="saveAction = 'draft'">{{ busy ? '正在保存' : editing ? '保存修改' : '保存学习路线' }}</button>
         </footer>
+        </fieldset>
       </form>
     </div>
   </AppShell>

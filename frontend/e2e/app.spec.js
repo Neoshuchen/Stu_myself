@@ -37,7 +37,7 @@ test.describe('普通学习者', () => {
 
   test('可访问核心功能、不能进入管理中心并能打开全局 AI 配置', async ({ page }) => {
     await login(page, learner)
-    await expect(page.getByRole('heading', { name: /准备好留下今天的证据了吗/ })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /今天也向前一步/ })).toBeVisible()
     await expect(page.getByRole('link', { name: '管理中心' })).toHaveCount(0)
 
     await page.goto('/plans')

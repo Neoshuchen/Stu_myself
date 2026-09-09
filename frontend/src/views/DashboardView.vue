@@ -74,18 +74,18 @@ function calendarLabel(item) {
     <div v-else-if="error" class="notice error">{{ error }}</div>
     <div v-else class="dashboard page-enter">
       <header class="page-heading">
-        <div><span class="eyebrow">{{ dateText }}</span><h1>{{ greeting }}，准备好留下今天的证据了吗？</h1></div>
+        <div><span class="eyebrow">{{ dateText }}</span><h1>{{ greeting }}，今天也向前一步。</h1><p>专注一个任务，让学到的东西留下痕迹。</p></div>
         <label v-if="data.enrollments?.length" class="route-switcher">当前路线<select :value="data.enrollment?.id" @change="enrollmentChanged"><option v-for="item in data.enrollments" :key="item.id" :value="item.id">{{ item.plan.title }} · Day {{ item.current_day }}{{ item.status === 'paused' ? ' · 已暂停' : item.status === 'completed' ? ' · 已完成' : '' }}</option></select></label>
         <span v-else class="focus-pill"><i></i> 今日专注</span>
       </header>
 
-      <EmptyState v-if="!data.enrollment" title="先选择一条值得走的路" copy="计划会替你保管方向，你只需要完成今天。" action="浏览学习计划" @action="router.push('/plans')" />
+      <EmptyState v-if="!data.enrollment" title="先选择一条值得走的路" copy="路线会替你保管方向，你只需要完成今天。" action="浏览学习路线" @action="router.push('/plans')" />
 
       <template v-else>
         <section v-if="data.rescue" class="rescue-card"><div><span class="eyebrow">WELCOME BACK · 离开 {{ data.rescue.days_away }} 天</span><h2>{{ data.rescue.title }}</h2><p>不用补回落下的时间，先恢复与这条路线的联系。</p><ol><li v-for="step in data.rescue.steps" :key="step">{{ step }}</li></ol></div><button class="button light" @click="openToday">开始回归任务</button></section>
         <section class="today-card" :style="{ '--accent-a': data.enrollment.plan.accent_start, '--accent-b': data.enrollment.plan.accent_end }">
           <div class="today-copy">
-            <span class="card-kicker">DAY {{ data.current_progress.day.day_number }} · 第 {{ data.current_progress.day.week_number }} 周</span>
+            <span class="card-kicker">今日任务 · DAY {{ data.current_progress.day.day_number }} / {{ data.enrollment.plan.total_days }}</span>
             <h2>{{ data.current_progress.day.title }}</h2>
             <p>{{ data.current_progress.day.hands_on_task }}</p>
             <p v-if="data.current_progress.resume_note">上次留给自己的提示：{{ data.current_progress.resume_note }}</p>
@@ -105,7 +105,7 @@ function calendarLabel(item) {
         </section>
 
         <section class="panel activity-calendar">
-          <div class="section-title"><div><span class="eyebrow">REAL ACTIVITY</span><h2>最近 28 天学习日历</h2></div><p>本周活跃 {{ data.activity.this_week_active_days }} 天 · 最长连续 {{ data.activity.longest_streak }} 天</p></div>
+          <div class="section-title"><div><h2>每一步，都算数</h2><p>最近 28 天的学习记录</p></div><p>本周活跃 {{ data.activity.this_week_active_days }} 天 · 最长连续 {{ data.activity.longest_streak }} 天</p></div>
           <div class="calendar-grid" aria-label="最近28天学习完成情况"><i v-for="item in data.activity.calendar" :key="item.date" :class="{ active: item.count, strong: item.count > 1 }" :title="calendarLabel(item)" :aria-label="calendarLabel(item)"></i></div>
           <div class="calendar-legend"><span>少</span><i></i><i class="active"></i><i class="strong"></i><span>多</span></div>
         </section>

@@ -24,7 +24,7 @@ const TeamView = () => import('./views/TeamView.vue')
 
 const router = createRouter({
   history: createWebHistory(),
-  scrollBehavior: () => ({ top: 0 }),
+  scrollBehavior: (to, from, savedPosition) => savedPosition || (to.path === from.path ? false : { top: 0 }),
   routes: [
     { path: '/', redirect: '/dashboard' },
     { path: '/login', component: LoginView, meta: { guest: true } },

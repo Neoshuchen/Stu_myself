@@ -9,6 +9,7 @@ import { auth } from '../auth'
 const route = useRoute()
 const router = useRouter()
 const menuOpen = ref(false)
+const menuToggle = ref(null)
 const sidePlan = ref(null)
 const notificationCount = ref(0)
 let sidePlanLoadVersion = 0
@@ -17,15 +18,15 @@ const icon = (paths) => `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.
 const stroke = 'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"'
 
 const nav = [
-  { to: '/dashboard', label: '今日', icon: icon(`<rect x="3" y="5" width="18" height="16" rx="3" ${stroke}/><path d="M3 10h18M8 3v4M16 3v4" ${stroke}/>`) },
+  { to: '/dashboard', label: '今日学习', group: '我的学习', icon: icon(`<rect x="3" y="5" width="18" height="16" rx="3" ${stroke}/><path d="M3 10h18M8 3v4M16 3v4" ${stroke}/>`) },
   { to: '/journey', label: '学习路径', icon: icon(`<circle cx="6" cy="6" r="2.6" ${stroke}/><circle cx="18" cy="18" r="2.6" ${stroke}/><path d="M8.6 6H15a3 3 0 0 1 0 6H9a3 3 0 0 0 0 6h6.4" ${stroke}/>`) },
   { to: '/review', label: '复习中心', icon: icon(`<path d="M5 8a8 8 0 1 1-1 7" ${stroke}/><path d="M5 4v4h4M9 12l2 2 4-4" ${stroke}/>` ) },
   { to: '/insights', label: '能力图谱', icon: icon(`<circle cx="12" cy="12" r="8.5" ${stroke}/><circle cx="12" cy="12" r="4.5" ${stroke}/><circle cx="12" cy="12" r="1.2" fill="currentColor"/>`) },
-  { to: '/plans', label: '发现计划', icon: icon(`<circle cx="12" cy="12" r="9" ${stroke}/><path d="M15.5 8.5l-2.2 4.8-4.8 2.2 2.2-4.8z" ${stroke}/>`) },
+  { to: '/plans', label: '发现路线', group: '探索与同行', icon: icon(`<circle cx="12" cy="12" r="9" ${stroke}/><path d="M15.5 8.5l-2.2 4.8-4.8 2.2 2.2-4.8z" ${stroke}/>`) },
   { to: '/community', label: '学习社区', icon: icon(`<path d="M4 6.5A3.5 3.5 0 0 1 7.5 3h9A3.5 3.5 0 0 1 20 6.5v6a3.5 3.5 0 0 1-3.5 3.5H9.5L4 20z" ${stroke}/>`) },
   { to: '/mutual-help', label: '学习互助', icon: icon(`<path d="M12 20s-7.2-4.6-9-9.2A5.2 5.2 0 0 1 12 6.4a5.2 5.2 0 0 1 9 4.4C19.2 15.4 12 20 12 20z" ${stroke}/>`) },
   { to: '/team', label: '学习小队', icon: icon(`<circle cx="8" cy="9" r="3" ${stroke}/><circle cx="17" cy="10" r="2.5" ${stroke}/><path d="M2.8 19c.6-3.2 2.3-4.8 5.2-4.8s4.6 1.6 5.2 4.8M13.5 15.2c2.8-.7 5.1.6 5.7 3.8" ${stroke}/>` ) },
-  { to: '/notifications', label: '通知', badge: true, icon: icon(`<path d="M5 17h14l-1.5-2.2V10a5.5 5.5 0 0 0-11 0v4.8zM10 20h4" ${stroke}/>` ) },
+  { to: '/notifications', label: '通知', group: '工作区', badge: true, icon: icon(`<path d="M5 17h14l-1.5-2.2V10a5.5 5.5 0 0 0-11 0v4.8zM10 20h4" ${stroke}/>` ) },
   { to: '/plans/new', label: '创建路线', exact: true, icon: icon(`<circle cx="12" cy="12" r="9" ${stroke}/><path d="M12 8v8M8 12h8" ${stroke}/>`) },
 ]
 const adminIcon = icon(`<path d="M4 12.5l5 5L20 6.5" ${stroke}/>`)
@@ -36,8 +37,10 @@ const learningContext = computed(() => route.path === '/dashboard' || route.path
 // 侧栏进度卡跟随「今日」页选中的路线：URL 里没带 enrollment 时读记住的那条。
 const selectedEnrollmentId = computed(() => route.params.enrollmentId || route.query.enrollment || (learningContext.value ? activeRoute.get() : ''))
 
+/** 根据导航项返回选中状态，学习正文归入学习路径，社区编辑仍归入社区。 */
 function navActive(item) {
-  if (item.to === '/plans/new') return route.path === item.to || route.path.endsWith('/edit')
+  if (item.to === '/journey' && route.path.startsWith('/learn/')) return true
+  if (item.to === '/plans/new') return route.path === item.to || (route.path.startsWith('/plans/') && !route.path.includes('/community') && route.path.endsWith('/edit'))
   if (item.to === '/plans') return route.path.startsWith('/plans') && !route.path.includes('/community') && route.path !== '/plans/new' && !route.path.endsWith('/edit')
   if (item.to === '/community') return route.path.startsWith('/community') || route.path.includes('/community')
   return route.path.startsWith(item.to)
@@ -88,21 +91,25 @@ onBeforeUnmount(() => window.removeEventListener('notifications-changed', loadNo
 </script>
 
 <template>
-  <div class="app-frame">
+  <div class="app-frame" @keydown.esc="if (menuOpen) { menuOpen = false; menuToggle?.focus() }">
     <header class="mobile-bar">
       <RouterLink class="brand" to="/dashboard"><span class="brand-mark">知</span><b>知序</b></RouterLink>
-      <button class="icon-button" aria-label="打开导航" @click="menuOpen = !menuOpen">{{ menuOpen ? '×' : '☰' }}</button>
+      <button ref="menuToggle" class="icon-button" aria-label="打开导航" aria-controls="app-sidebar" :aria-expanded="menuOpen" @click="menuOpen = !menuOpen">{{ menuOpen ? '×' : '☰' }}</button>
     </header>
 
-    <aside class="sidebar" :class="{ open: menuOpen }">
+    <aside id="app-sidebar" class="sidebar" :class="{ open: menuOpen }" aria-label="导航与账号">
+      <button class="nav-close icon-button" aria-label="关闭导航" @click="menuOpen = false; menuToggle?.focus()">×</button>
       <RouterLink class="brand desktop-brand" to="/dashboard">
         <span class="brand-mark">知</span>
-        <span><b>知序</b><small>Make today count.</small></span>
+        <span><b>知序</b><small>让学习，日有所进</small></span>
       </RouterLink>
       <nav class="main-nav" aria-label="主导航">
-        <RouterLink v-for="item in visibleNav" :key="item.to" :to="item.to" :class="{ active: navActive(item) }" @click="menuOpen = false">
-          <span class="nav-ico" v-html="item.icon"></span>{{ item.label }}<b v-if="item.badge && notificationCount" class="nav-badge">{{ notificationCount > 99 ? '99+' : notificationCount }}</b>
-        </RouterLink>
+        <template v-for="item in visibleNav" :key="item.to">
+          <p v-if="item.group" class="nav-group-label">{{ item.group }}</p>
+          <RouterLink :to="item.to" :class="{ active: navActive(item) }" :aria-current="navActive(item) ? 'page' : undefined" @click="menuOpen = false">
+            <span class="nav-ico" aria-hidden="true" v-html="item.icon"></span>{{ item.label }}<b v-if="item.badge && notificationCount" class="nav-badge">{{ notificationCount > 99 ? '99+' : notificationCount }}</b>
+          </RouterLink>
+        </template>
       </nav>
       <div v-if="sidePlan" class="side-plan">
         <span>{{ sidePlan.label }}</span>
