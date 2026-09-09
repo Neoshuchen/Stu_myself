@@ -63,8 +63,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
+      # pnpm 由下一步 Corepack 提供，setup-node 阶段不能提前调用 pnpm 初始化缓存。
       - run: corepack enable
       - name: Frontend locked install, audit and build
         working-directory: frontend
