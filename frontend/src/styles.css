@@ -409,6 +409,23 @@ pre, code { font-family: var(--font-mono); }
 .section-number { color: var(--accent); font-size: 10px; font-weight: 700; letter-spacing: 0.06em; }
 .content-section h2 { margin: 0 0 14px; font-size: 20px; font-weight: 650; }
 .content-section .lead, .content-body { color: var(--ink-soft); font-size: 13px; line-height: 1.9; white-space: pre-line; }
+.practice-topic { min-width: 0; padding: 20px 0; border-top: 1px solid var(--line); }
+.practice-topic h3, .practice-delivery h3 { margin: 0 0 12px; color: var(--ink); font-size: 16px; line-height: 1.6; }
+.practice-actions { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding-left: 22px; color: var(--ink-soft); font-size: 14px; line-height: 1.85; overflow-wrap: anywhere; }
+.practice-actions li::marker { color: var(--accent); font-weight: 700; }
+.practice-material { margin: 16px 0; padding: 14px 16px; background: var(--surface-soft); border: 1px solid var(--line); border-radius: 10px; }
+.practice-material summary, .practice-guidance > summary { color: var(--ink); font-size: 14px; line-height: 1.7; font-weight: 650; cursor: pointer; }
+.practice-material p, .practice-material li, .practice-observe li, .practice-delivery > p { color: var(--ink-soft); font-size: 13px; line-height: 1.85; overflow-wrap: anywhere; }
+.practice-material pre { max-width: 100%; max-height: 320px; overflow: auto; padding: 16px; color: var(--code-ink); background: var(--code); border-radius: 8px; font-size: 12px; line-height: 1.8; }
+.practice-command { display: grid; gap: 6px; }
+.practice-command code { white-space: pre-wrap; overflow-wrap: anywhere; }
+.practice-observe { padding: 16px; background: var(--accent-soft); border-radius: 10px; }
+.practice-observe h4 { margin: 0 0 8px; color: var(--accent); font-size: 13px; }
+.practice-observe ul { margin: 0; padding-left: 18px; }
+.practice-delivery { padding-top: 20px; border-top: 1px solid var(--line); }
+.practice-topic > .text-action { text-align: left; line-height: 1.8; }
+.practice-guidance > section { padding-top: 20px; }
+.practice-guidance h3 { font-size: 15px; }
 .concept-map { display: grid; gap: 8px; margin-top: 20px; }
 .concept-map > div { display: grid; grid-template-columns: minmax(90px, 130px) 1fr; gap: 15px; padding: 13px 15px; background: var(--surface-soft); border-radius: 10px; }
 .concept-map b { color: var(--ink); font-size: 13px; }
@@ -1266,7 +1283,8 @@ fieldset.editor-form { min-width: 0; margin: 0; padding: 0; border: 0; }
   .lesson-index { width: 42px; height: 52px; }
   .lesson-heading h1 { font-size: 25px; }
   .lesson-time { display: none; }
-  .content-section { grid-template-columns: 1fr; padding: 20px; }
+  /* 长命令只在代码块内滚动，不能由网格的内容最小宽度撑开手机页面。 */
+  .content-section { grid-template-columns: minmax(0, 1fr); padding: 20px; }
   .short-study { padding: 20px; }
   .short-study .section-title { align-items: start; flex-direction: column; }
   .short-study .section-title label { justify-content: space-between; width: 100%; }

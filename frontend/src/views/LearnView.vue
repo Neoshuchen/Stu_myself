@@ -189,12 +189,18 @@ function downloadLab() {
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
-/** 把案件验收要求放入现有证据表单草稿，等待用户填写实际结果并提交。 */
-function prepareLabEvidence() {
-  if ((evidenceForm.value.title || evidenceForm.value.content) && !confirm('用案件记录模板替换当前未提交的证据文字？')) return
-  evidenceForm.value.title = progress.value.day.lab.title
-  evidenceForm.value.kind = 'test'
-  evidenceForm.value.content = '复现命令与环境：\n修复前的失败输出：\n根因：\n修改说明：\n修复后的检查输出：\n我补充的边界样例：'
+/** 按当天验收项或案件生成证据草稿；forLab 选择案件模式，无返回值，不自动提交或完成学习。 */
+function prepareEvidenceTemplate(forLab = false) {
+  if ((evidenceForm.value.title || evidenceForm.value.content) && !confirm('用练习记录模板替换当前未提交的证据文字？')) return
+  const day = progress.value.day
+  evidenceForm.value.title = forLab ? day.lab.title : `Day ${day.day_number} · ${day.title}`
+  evidenceForm.value.kind = forLab ? 'test' : 'report'
+  // 只列出待填写的问题，不能把参考输出或勾选状态伪装成用户已经完成的证据。
+  evidenceForm.value.content = forLab
+    ? '复现命令与环境：\n修复前的失败输出：\n根因：\n修改说明：\n修复后的检查输出：\n我补充的边界样例：'
+    : [`本次任务：${day.hands_on_task}`, '我使用的材料或输入：\n', '实际操作与观察结果：\n',
+        ...day.acceptance_criteria.map((criterion, index) => `验收 ${index + 1}：${criterion}\n我的结果与证据位置：\n`),
+        '遇到的问题与处理：\n', '仍不确定的地方：\n'].join('\n')
   focusLessonSection('lesson-evidence')
 }
 
@@ -348,6 +354,7 @@ async function requestPeerReview() {
       </header>
       <nav class="lesson-jumps" aria-label="本日学习导航">
         <button @click="focusLessonSection('lesson-knowledge')">知识点 <span>{{ progress.knowledge_checks.filter(Boolean).length }}/{{ progress.knowledge_checks.length }}</span></button>
+        <button @click="focusLessonSection('lesson-practice')">动手实践</button>
         <button @click="focusLessonSection('lesson-checkpoint')">当日验收 <span>{{ progress.acceptance_checks.filter(Boolean).length }}/{{ progress.acceptance_checks.length }}</span></button>
         <button @click="focusLessonSection('lesson-evidence')">学习证据 <span>{{ progress.evidence.length }}</span></button>
       </nav>
@@ -394,28 +401,50 @@ async function requestPeerReview() {
           <section v-if="progress.day.lab" class="panel detective-lab">
             <span class="eyebrow">动手实验</span><h2>{{ progress.day.lab.title }}</h2><p>{{ progress.day.lab.brief }}</p>
             <ol><li>下载案件，在本地运行并保留失败输出。</li><li>说明根因，修复函数并保留检查项。</li><li>全部检查通过后，再补一个边界样例并提交证据。</li></ol>
-            <div class="button-row"><button class="button secondary" @click="downloadLab">下载 Python 案件</button><button class="button ghost" @click="prepareLabEvidence">填写案件证据</button></div>
+            <div class="button-row"><button class="button secondary" @click="downloadLab">下载 Python 案件</button><button class="button ghost" @click="prepareEvidenceTemplate(true)">填写案件证据</button></div>
             <details><summary>我已尝试，查看线索</summary><p>{{ progress.day.lab.hint }}</p><details><summary>核对修复思路</summary><p>{{ progress.day.lab.solution }}</p></details></details>
           </section>
 
-          <section v-for="(block, index) in daySections" :key="block.title" class="content-section">
-            <div class="section-number">{{ String(index + 2).padStart(2, '0') }}</div><div><h2>{{ block.title }}</h2><p class="content-body">{{ block.body }}</p></div>
-          </section>
-
-          <section v-if="comprehensiveTask" class="content-section comprehensive-task">
-            <div class="section-number">任务</div><div>
-              <h2>独立综合任务</h2><h3>{{ comprehensiveTask.goal }}</h3>
-              <dl><div><dt>固定输入</dt><dd>{{ comprehensiveTask.input }}</dd></div><div><dt>应交付输出</dt><dd>{{ comprehensiveTask.output }}</dd></div></dl>
-              <h4>实现约束</h4><ul><li v-for="item in comprehensiveTask.requirements" :key="item">{{ item }}</li></ul>
-              <h4>必须验证的失败路径</h4><ul><li v-for="item in comprehensiveTask.error_cases" :key="item">{{ item }}</li></ul>
+          <section id="lesson-practice" class="content-section lesson-practice" tabindex="-1" aria-label="本日实践">
+            <div class="section-number">02</div><div>
+              <h2>把今天的知识用起来</h2>
+              <p class="content-body practice-task">{{ progress.day.hands_on_task }}</p>
+              <article v-for="(item, index) in knowledgeDetails" :key="index" class="practice-topic">
+                <h3>{{ item.name }}</h3>
+                <p v-if="item.implementation_requirement && item.implementation_requirement !== progress.day.hands_on_task" class="content-body">{{ item.implementation_requirement }}</p>
+                <ol v-if="item.practice_steps?.length" class="practice-actions"><li v-for="(step, stepIndex) in item.practice_steps" :key="stepIndex">{{ step }}</li></ol>
+                <details v-if="item.reference_code || item.run_command || item.code_explanation?.length" class="practice-material">
+                  <summary>查看「{{ item.name }}」的示例与提示</summary>
+                  <p>示例供理解和改写，完成情况以你的实际操作和验收结果为准。</p>
+                  <pre v-if="item.reference_code"><code>{{ item.reference_code }}</code></pre>
+                  <p v-if="item.run_command" class="practice-command"><b>运行或操作方式</b><code>{{ item.run_command }}</code></p>
+                  <ul v-if="item.code_explanation?.length"><li v-for="(line, lineIndex) in item.code_explanation" :key="lineIndex">{{ line }}</li></ul>
+                </details>
+                <div v-if="item.expected_results?.length" class="practice-observe"><h4>观察这些结果</h4><ul><li v-for="(result, resultIndex) in item.expected_results" :key="resultIndex">{{ result }}</li></ul></div>
+                <details v-if="item.pitfalls?.length" class="practice-material"><summary>结果不符合预期？检查这些问题</summary><ul><li v-for="(pitfall, pitfallIndex) in item.pitfalls" :key="pitfallIndex">{{ pitfall }}</li></ul></details>
+                <button class="text-action" @click="openKnowledge(item, index)">回看「{{ item.name }}」的原理 →</button>
+              </article>
+              <div class="practice-delivery">
+                <h3>用自己的结果完成验收</h3>
+                <ol class="practice-actions"><li v-for="(criterion, index) in progress.day.acceptance_criteria" :key="index">{{ criterion }}</li></ol>
+                <div class="button-row"><button class="button secondary" @click="prepareEvidenceTemplate()">按本日要求整理证据</button><button class="button ghost" @click="focusLessonSection('lesson-checkpoint')">核对验收项</button></div>
+                <p>整理只会生成待填写的草稿，不会提交证据或标记完成。</p>
+              </div>
             </div>
           </section>
 
-          <section v-if="verification" class="content-section verification-section">
-            <div class="section-number">验证</div><div><h2>测试与学习证据</h2>
-              <div class="verification-columns"><div><h4>完成检查</h4><ul><li v-for="item in verification.checks" :key="item">{{ item }}</li></ul></div><div><h4>需要提交</h4><ul><li v-for="item in verification.evidence" :key="item">{{ item }}</li></ul></div></div>
-            </div>
-          </section>
+          <details v-if="daySections.length || comprehensiveTask || verification" class="panel practice-guidance">
+            <summary>学习方法与补充要求</summary>
+            <section v-for="(block, index) in daySections" :key="index"><h3>{{ block.title }}</h3><p class="content-body">{{ block.body }}</p></section>
+            <section v-if="comprehensiveTask" class="comprehensive-task">
+              <h3>任务约束</h3>
+              <p v-if="comprehensiveTask.goal && comprehensiveTask.goal !== progress.day.hands_on_task" class="content-body">{{ comprehensiveTask.goal }}</p>
+              <dl><div><dt>使用的输入</dt><dd>{{ comprehensiveTask.input }}</dd></div><div><dt>应交付输出</dt><dd>{{ comprehensiveTask.output }}</dd></div></dl>
+              <ul><li v-for="item in comprehensiveTask.requirements" :key="item">{{ item }}</li></ul>
+              <h4>边界与失败情况</h4><ul><li v-for="item in comprehensiveTask.error_cases" :key="item">{{ item }}</li></ul>
+            </section>
+            <section v-if="verification" class="verification-section"><h3>补充自检与证据要求</h3><div class="verification-columns"><div><h4>完成检查</h4><ul><li v-for="item in verification.checks" :key="item">{{ item }}</li></ul></div><div><h4>需要提交</h4><ul><li v-for="item in verification.evidence" :key="item">{{ item }}</li></ul></div></div></section>
+          </details>
 
           <section v-if="progress.day.commands.length" class="content-section">
             <div class="section-number">执行</div><div><h2>运行与验证</h2><pre v-for="command in progress.day.commands" :key="command"><code>{{ command }}</code></pre></div>

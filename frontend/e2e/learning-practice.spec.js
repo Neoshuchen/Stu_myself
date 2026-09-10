@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { readFileSync } from 'node:fs'
 
 /** 为交互回归隔离 API，不调用真实账号、供应商或发布接口，返回可观察的写入记录。 */
 async function preparePage(page, userId = 1, challenges = []) {
@@ -74,6 +75,84 @@ async function preparePage(page, userId = 1, challenges = []) {
   return { writes, errors, progress, evidence }
 }
 
+test('全部课程的实践区展示当日步骤、示例和结果，旧流程默认折叠', async ({ page }) => {
+  // 覆盖整个真实目录，防止只修复 Git 或用固定示例替代其他路线的内容。
+  test.setTimeout(240_000)
+  const state = await preparePage(page)
+  const catalog = JSON.parse(readFileSync(new URL('../../backend/data/system_roadmaps.v2.json', import.meta.url), 'utf8'))
+  let checked = 0
+  for (const plan of catalog.roadmaps) {
+    for (const day of plan.days) {
+      const details = day.content.knowledge_details
+      state.progress.day = { ...day, plan_slug: plan.slug, knowledge_details: details, commands: [], community_supplements: [] }
+      state.progress.knowledge_checks = details.map(() => false)
+      state.progress.acceptance_checks = day.acceptance_criteria.map(() => false)
+      await page.goto(`/learn/1/${day.day_number}`)
+      await expect(page.locator('.practice-task')).toHaveText(day.hands_on_task)
+      await expect(page.locator('.practice-topic')).toHaveCount(details.length)
+      for (let index = 0; index < details.length; index += 1) {
+        const topic = page.locator('.practice-topic').nth(index)
+        await expect(topic.locator('.practice-actions li')).toHaveText(details[index].practice_steps)
+        await expect(topic.locator('.practice-observe li')).toHaveText(details[index].expected_results)
+        expect(await topic.locator('pre code').textContent()).toBe(details[index].reference_code)
+      }
+      await expect(page.locator('.practice-delivery li')).toHaveText(day.acceptance_criteria)
+      await expect(page.locator('.practice-guidance')).not.toHaveAttribute('open', '')
+      await expect(page.locator('.practice-guidance section').first()).not.toBeVisible()
+      checked += 1
+    }
+    await page.setViewportSize({ width: 320, height: 844 })
+    await page.locator('.practice-topic .practice-material summary').first().click()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    await page.setViewportSize({ width: 1280, height: 900 })
+  }
+  expect(checked).toBe(catalog.roadmaps.reduce((count, plan) => count + plan.days.length, 0))
+  expect(state.writes.some(item => item.path === '/evidence/' || item.path.endsWith('/complete/'))).toBe(false)
+  expect(state.errors).toEqual([])
+})
+
+test('实践证据使用本日验收项且不自动提交，取消替换保留原稿', async ({ page }) => {
+  const state = await preparePage(page)
+  const catalog = JSON.parse(readFileSync(new URL('../../backend/data/system_roadmaps.v2.json', import.meta.url), 'utf8'))
+  const plan = catalog.roadmaps.find(item => item.slug === 'git-mastery-7d')
+  const day = plan.days[1]
+  state.progress.day = { ...day, plan_slug: plan.slug, knowledge_details: day.content.knowledge_details, commands: [], community_supplements: [] }
+  state.progress.acceptance_checks = day.acceptance_criteria.map(() => false)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/learn/1/2')
+  await page.locator('.practice-topic .practice-material summary').first().click()
+  await expect(page.locator('.practice-topic pre')).toContainText('git add -p')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await page.getByRole('button', { name: '按本日要求整理证据', exact: true }).click()
+  await expect(page.locator('#lesson-evidence')).toBeFocused()
+  await expect(page.getByPlaceholder('证据标题')).toHaveValue(`Day 2 · ${day.title}`)
+  const content = page.getByPlaceholder('粘贴关键输出或说明；可直接 Ctrl+V 粘贴图片')
+  for (const criterion of day.acceptance_criteria) expect(await content.inputValue()).toContain(criterion)
+  await expect(content).toHaveValue(/我的结果与证据位置：/)
+  await content.fill('我已经写好的真实实验结果')
+  page.once('dialog', dialog => dialog.dismiss())
+  await page.getByRole('button', { name: '按本日要求整理证据', exact: true }).click()
+  await expect(content).toHaveValue('我已经写好的真实实验结果')
+  expect(state.writes.some(item => item.path === '/evidence/' || item.path.endsWith('/complete/'))).toBe(false)
+  expect(state.errors).toEqual([])
+})
+
+test('个人路线缺少知识详情时仍展示真实任务，保留原有自定义正文', async ({ page }) => {
+  const state = await preparePage(page)
+  state.progress.day.knowledge_details = []
+  state.progress.knowledge_checks = []
+  state.progress.day.content = [{ title: '我的任务安排', body: '先访谈两位同伴，再整理共同问题。' }]
+  state.progress.day.hands_on_task = '整理一页访谈结论'
+  await page.goto('/learn/1/2')
+  await expect(page.locator('.practice-task')).toHaveText('整理一页访谈结论')
+  await expect(page.locator('.practice-topic')).toHaveCount(0)
+  await page.getByText('学习方法与补充要求', { exact: true }).click()
+  await expect(page.locator('.practice-guidance')).toContainText('先访谈两位同伴，再整理共同问题。')
+  await page.getByRole('button', { name: '按本日要求整理证据', exact: true }).click()
+  await expect(page.getByPlaceholder('粘贴关键输出或说明；可直接 Ctrl+V 粘贴图片')).toHaveValue(/整理一页访谈结论/)
+  expect(state.errors).toEqual([])
+})
+
 test('路线搜索使用标题、简介和适合人群，清空后恢复列表', async ({ page }) => {
   const state = await preparePage(page)
   const plans = [
@@ -123,6 +202,9 @@ test('学习导航在桌面和手机均能直达内容并保留完成条件', as
     await expect(page.locator('#lesson-checkpoint')).toBeFocused()
     await expect(page.locator('#lesson-checkpoint h2')).toBeInViewport()
     await expect(page.getByRole('button', { name: '请先完成上方待办', exact: true })).toBeDisabled()
+    await jumps.getByRole('button', { name: '动手实践', exact: true }).click()
+    await expect(page.locator('#lesson-practice')).toBeFocused()
+    await expect(page.locator('#lesson-practice h2')).toBeInViewport()
     await jumps.getByRole('button', { name: /知识点/ }).click()
     await expect(page.locator('#lesson-knowledge')).toBeFocused()
     await expect(page.locator('#lesson-knowledge h2')).toBeInViewport()
@@ -154,7 +236,7 @@ test('短时记录、实验下载与私人成果草稿保持独立的完成和�
   const state = await preparePage(page)
   await page.goto('/learn/1/2')
   await page.getByLabel('可用时间').selectOption('30')
-  await expect(page.getByText('画出两个变量的指向', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('短时学习').getByText('画出两个变量的指向', { exact: true })).toBeVisible()
   await page.getByText('留下接续提示', { exact: true }).click()
   await page.getByLabel('下次从这里继续').fill('下次补空列表测试')
   await page.getByRole('button', { name: '保存本段进度' }).click()
